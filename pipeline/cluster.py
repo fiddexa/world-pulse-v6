@@ -47,12 +47,31 @@ def _article_text(article: dict) -> str:
     )
 
 
+def _title_tokens(article: dict) -> set[str]:
+    title = normalize_text(
+        article.get("title", "")
+    )
+
+    return {
+        token
+        for token in title.split()
+        if token
+    }
+
+
 def _tokens(article: dict) -> set[str]:
     return {
         token
         for token in _article_text(article).split()
         if token
     }
+
+
+def _title_similarity(a: dict, b: dict) -> float:
+    return _jaccard(
+        _title_tokens(a),
+        _title_tokens(b),
+    )
 
 
 def _jaccard(a: set[str], b: set[str]) -> float:
@@ -139,8 +158,10 @@ def _similar_enough(a: dict, b: dict) -> bool:
         _tokens(b),
     )
 
+    title_lexical = _title_similarity(a, b)
+
     # Strong event identity:
-    # same event type + same location + reasonable wording overlap.
+    # same event type + same location + similar titles.
     #
     # This allows:
     # "Earthquake strikes Nepal"
@@ -148,6 +169,9 @@ def _similar_enough(a: dict, b: dict) -> bool:
     #
     # to form one event even though the verbs differ.
     if shared_types and shared_locations:
+        if title_lexical >= 0.30:
+            return True
+
         if lexical >= MIN_TEXT_SIMILARITY:
             return True
 

@@ -81,3 +81,25 @@ def test_same_event_different_wording():
 
 def test_empty_input():
     assert cluster_articles([]) == []
+
+
+def test_same_event_with_different_summaries_clusters_together():
+    articles = [
+        {
+            "title": "Major earthquake strikes Nepal",
+            "summary": "A powerful earthquake hits Nepal.",
+            "published_at": "2026-08-28T10:00:00Z",
+            "source": "Reuters",
+        },
+        {
+            "title": "Strong earthquake hits Nepal",
+            "summary": "The earthquake causes widespread damage.",
+            "published_at": "2026-08-28T10:20:00Z",
+            "source": "BBC",
+        },
+    ]
+
+    events = cluster_articles(articles)
+
+    assert len(events) == 1
+    assert len(events[0]["articles"]) == 2
