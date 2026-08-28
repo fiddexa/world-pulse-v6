@@ -1,6 +1,6 @@
-# =========================================================
-# WORLD PULSE v6 — TEXT NORMALIZATION
-# =========================================================
+"""
+WORLD PULSE v6 - Text normalization layer.
+"""
 
 import re
 import unicodedata
@@ -8,98 +8,64 @@ import unicodedata
 
 def normalize_text(value):
     """
-    Normalize text for deterministic processing.
-
-    This function does NOT classify events.
-    It does NOT calculate similarity.
-    It only cleans text.
+    Normalize text consistently:
+    - convert to string
+    - Unicode normalize
+    - lowercase
+    - normalize dash variants to '-'
+    - remove punctuation except hyphen
+    - collapse whitespace
     """
-
     if value is None:
         return ""
 
     text = str(value)
-
-    # Unicode normalization
-    text = unicodedata.normalize(
-        "NFKC",
-        text
-    )
-
-    # Lowercase
+    text = unicodedata.normalize("NFKC", text)
     text = text.lower()
 
-    # Normalize common dash variants
-    text = (
-        text
-        .replace("–", "-")
-        .replace("—", "-")
-        .replace("-", "-")
-        .replace("_", " ")
-    )
+    # Normalize common dash characters.
+    text = re.sub(r"[\u2010\u2011\u2012\u2013\u2014\u2212]", "-", text)
 
-    # Remove URLs
-    text = re.sub(
-        r"https?://\S+|www\.\S+",
-        " ",
-        text
-    )
+    # Remove punctuation except hyphen.
+    text = re.sub(r"[^\w\s-]", "", text, flags=re.UNICODE)
 
-    # Keep letters/numbers/spaces
-    # Unicode-aware: Cyrillic and other languages remain intact.
-    text = re.sub(
-        r"[^\w\s-]",
-        " ",
-        text,
-        flags=re.UNICODE
-    )
+    # Collapse whitespace.
+    text = re.sub(r"\s+", " ", text).strip()
 
-    # Collapse whitespace
-    text = re.sub(
-        r"\s+",
-        " ",
-        text
-    )
-
-    return text.strip()
+    return text
 
 
 def normalize_source(value):
     """
-    Normalize source name.
+    Normalize source names.
     """
+    if value is None:
+        return ""
 
     return normalize_text(value)
 
 
 def normalize_article(article):
     """
-    Return a normalized copy of an article.
+    Normalize a news article without changing its structure.
+    Invalid input returns an empty dictionary.
     """
-
     if not isinstance(article, dict):
         return {}
 
     result = dict(article)
 
-    result["title"] = normalize_text(
-        article.get("title", "")
-    )
+    for field in (
+        "title",
+        "summary",
+        "source",
+        "category",
+        "region",
+    ):
+        if field in result:
+            result[field] = normalize_text(result[field])
 
-    result["summary"] = normalize_text(
-        article.get("summary", "")
-    )
-
-    result["source"] = normalize_source(
-        article.get("source", "")
-    )
-
-    result["category"] = normalize_text(
-        article.get("category", "")
-    )
-
-    result["region"] = normalize_text(
-        article.get("region", "")
-    )
+    if "source" in result:
+        result["source"] = normalize_source(result["source"])
 
     return result
