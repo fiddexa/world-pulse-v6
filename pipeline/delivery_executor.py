@@ -1,11 +1,10 @@
 """
 WORLD PULSE v6 - Delivery Executor
 
-Coordinates delivery policy and idempotency state.
+Coordinates delivery policy, idempotency state, and publishers.
 
-This layer does not perform external network delivery yet.
-It provides a deterministic execution decision for future
-Telegram/Website publishers.
+The publisher is injectable so delivery can be tested without
+external network calls.
 """
 
 from pipeline.delivery import delivery_policy
@@ -61,11 +60,16 @@ def execute_delivery(
     channel,
     log,
     success=True,
+    publisher=None,
 ):
     """
-    Execute a simulated delivery.
+    Execute delivery for one channel.
 
-    No external network call is made.
+    When a publisher is supplied, its publish() result determines
+    whether the delivery is recorded as SENT or FAILED.
+
+    When no publisher is supplied, the original deterministic
+    simulation behavior is preserved.
     """
 
     status = execution_status(
@@ -83,6 +87,37 @@ def execute_delivery(
     if status == SKIPPED:
         return {
             "status": SKIPPED,
+            "channel": channel,
+        }
+
+    if publisher is not None:
+        result = publisher.publish(event)
+
+        if not isinstance(result, dict):
+            log.record_failed(event, channel)
+
+            return {
+                "status": "FAILED",
+                "channel": channel,
+                "reason": "INVALID_PUBLISHER_RESULT",
+            }
+
+        published_status = result.get("status")
+
+        if published_status == SENT:
+            log.record_sent(event, channel)
+
+            return {
+                **result,
+                "status": SENT,
+                "channel": channel,
+            }
+
+        log.record_failed(event, channel)
+
+        return {
+            **result,
+            "status": "FAILED",
             "channel": channel,
         }
 
@@ -106,9 +141,18 @@ def execute_event(
     event,
     log,
     channels=None,
+    publishers=None,
 ):
     """
-    Simulate delivery for the requested channels.
+    Execute delivery for the requested channels.
+
+    `publishers` is an optional mapping:
+        {
+            "telegram": TelegramPublisher(...),
+            "website": WebsitePublisher(...),
+        }
+
+    Without publishers, deterministic simulation is preserved.
     """
 
     if channels is None:
@@ -120,13 +164,19 @@ def execute_event(
     if not isinstance(channels, list):
         channels = []
 
+    if not isinstance(publishers, dict):
+        publishers = {}
+
     results = {}
 
     for channel in channels:
+        publisher = publishers.get(channel)
+
         results[channel] = execute_delivery(
             event,
             channel,
             log,
+            publisher=publisher,
         )
 
     return results

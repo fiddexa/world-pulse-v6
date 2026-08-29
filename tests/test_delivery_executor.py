@@ -197,3 +197,126 @@ def test_original_event_is_not_modified():
     execute_event(original, log)
 
     assert original == before
+
+
+def test_executor_uses_publisher():
+    from pipeline.publisher import MockPublisher
+
+    log = DeliveryLog()
+    publisher = MockPublisher(TELEGRAM)
+
+    result = execute_delivery(
+        event(),
+        TELEGRAM,
+        log,
+        publisher=publisher,
+    )
+
+    assert result["status"] == SENT
+    assert len(publisher.published) == 1
+    assert log.has_been_sent(
+        event(),
+        TELEGRAM,
+    )
+
+
+def test_executor_skips_before_publisher():
+    from pipeline.publisher import MockPublisher
+
+    log = DeliveryLog()
+    publisher = MockPublisher(TELEGRAM)
+
+    execute_delivery(
+        event(),
+        TELEGRAM,
+        log,
+        publisher=publisher,
+    )
+
+    result = execute_delivery(
+        event(),
+        TELEGRAM,
+        log,
+        publisher=publisher,
+    )
+
+    assert result["status"] == SKIPPED
+    assert len(publisher.published) == 1
+
+
+def test_executor_records_publisher_failure():
+    class FailedPublisher:
+        def publish(self, event):
+            return {
+                "status": "FAILED",
+                "channel": TELEGRAM,
+                "reason": "TEST_FAILURE",
+            }
+
+    log = DeliveryLog()
+
+    result = execute_delivery(
+        event(),
+        TELEGRAM,
+        log,
+        publisher=FailedPublisher(),
+    )
+
+    assert result["status"] == "FAILED"
+    assert log.status(
+        event(),
+        TELEGRAM,
+    ) == "FAILED"
+
+
+def test_executor_can_use_telegram_publisher():
+    from pipeline.telegram_publisher import TelegramPublisher
+
+    def transport(**kwargs):
+        return {
+            "ok": True,
+            "result": {
+                "message_id": 123,
+            },
+        }
+
+    publisher = TelegramPublisher(
+        token="test-token",
+        chat_id="-100123",
+        transport=transport,
+    )
+
+    log = DeliveryLog()
+
+    result = execute_delivery(
+        event(),
+        TELEGRAM,
+        log,
+        publisher=publisher,
+    )
+
+    assert result["status"] == SENT
+    assert result["message_id"] == 123
+    assert log.has_been_sent(
+        event(),
+        TELEGRAM,
+    )
+
+
+def test_execute_event_accepts_publishers():
+    from pipeline.publisher import MockPublisher
+
+    log = DeliveryLog()
+    telegram = MockPublisher(TELEGRAM)
+
+    result = execute_event(
+        event(),
+        log,
+        channels=[TELEGRAM],
+        publishers={
+            TELEGRAM: telegram,
+        },
+    )
+
+    assert result[TELEGRAM]["status"] == SENT
+    assert len(telegram.published) == 1
