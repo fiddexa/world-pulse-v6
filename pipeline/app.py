@@ -19,6 +19,7 @@ ranking
 """
 
 from pipeline.cluster import cluster_articles
+from pipeline.editorial import decide_events
 from pipeline.extract import extract_facts
 from pipeline.intelligence import analyze_events
 from pipeline.normalize import normalize_article
@@ -94,4 +95,6 @@ def process_articles(articles):
 
     ranked = rank_events(analyzed)
 
-    return ranked
+    editorial = decide_events(ranked)
+
+    return editorial
