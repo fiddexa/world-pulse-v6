@@ -16,9 +16,12 @@ verification
 intelligence
     ↓
 ranking
+    ↓
+editorial
 """
 
 from pipeline.cluster import cluster_articles
+from pipeline.edition import build_edition
 from pipeline.editorial import decide_events
 from pipeline.extract import extract_facts
 from pipeline.intelligence import analyze_events
@@ -30,6 +33,8 @@ from pipeline.verify import verify_events
 def process_articles(articles):
     """
     Run the complete World Pulse v6 processing pipeline.
+
+    Returns the processed editorial events as a list.
     """
 
     if not isinstance(articles, list):
@@ -98,3 +103,13 @@ def process_articles(articles):
     editorial = decide_events(ranked)
 
     return editorial
+
+
+def build_edition_from_articles(articles):
+    """
+    Process articles and build a WORLD PULSE edition.
+    """
+
+    editorial = process_articles(articles)
+
+    return build_edition(editorial)
