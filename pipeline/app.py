@@ -26,6 +26,7 @@ from pipeline.editorial import decide_events
 from pipeline.extract import extract_facts
 from pipeline.intelligence import analyze_events
 from pipeline.normalize import normalize_article
+from pipeline.publication import build_publications
 from pipeline.ranking import rank_events
 from pipeline.verify import verify_events
 
@@ -110,7 +111,9 @@ def process_articles(articles):
 
     content = build_contents(editorial)
 
-    return content
+    publication = build_publications(content)
+
+    return publication
 
 
 def build_edition_from_articles(articles):
