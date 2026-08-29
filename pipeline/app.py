@@ -22,6 +22,7 @@ editorial
 
 from pipeline.cluster import cluster_articles
 from pipeline.content import build_contents
+from pipeline.delivery import build_deliveries
 from pipeline.editorial import decide_events
 from pipeline.extract import extract_facts
 from pipeline.intelligence import analyze_events
@@ -113,7 +114,9 @@ def process_articles(articles):
 
     publication = build_publications(content)
 
-    return publication
+    delivery = build_deliveries(publication)
+
+    return delivery
 
 
 def build_edition_from_articles(articles):
