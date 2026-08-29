@@ -21,7 +21,7 @@ editorial
 """
 
 from pipeline.cluster import cluster_articles
-from pipeline.edition import build_edition
+from pipeline.content import build_contents
 from pipeline.editorial import decide_events
 from pipeline.extract import extract_facts
 from pipeline.intelligence import analyze_events
@@ -53,10 +53,16 @@ def process_articles(articles):
     normalized = []
 
     for article in valid_articles:
+        original_title = str(article.get("title", "")).strip()
+        original_summary = str(article.get("summary", "")).strip()
+
         result = normalize_article(article)
 
         if not result or not result.get("title"):
             continue
+
+        result["original_title"] = original_title
+        result["original_summary"] = original_summary
 
         facts = extract_facts(result)
 
@@ -102,7 +108,9 @@ def process_articles(articles):
 
     editorial = decide_events(ranked)
 
-    return editorial
+    content = build_contents(editorial)
+
+    return content
 
 
 def build_edition_from_articles(articles):
@@ -111,5 +119,3 @@ def build_edition_from_articles(articles):
     """
 
     editorial = process_articles(articles)
-
-    return build_edition(editorial)
