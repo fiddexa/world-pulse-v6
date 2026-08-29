@@ -1,13 +1,13 @@
 """
 WORLD PULSE v6 - Application Pipeline
 
-Orchestrates the independent processing layers:
+Orchestrates the processing layers:
 
 articles
     ↓
 normalize
     ↓
-extract
+extract facts
     ↓
 cluster
     ↓
@@ -19,6 +19,7 @@ ranking
 """
 
 from pipeline.cluster import cluster_articles
+from pipeline.extract import extract_facts
 from pipeline.intelligence import analyze_events
 from pipeline.normalize import normalize_article
 from pipeline.ranking import rank_events
@@ -28,8 +29,6 @@ from pipeline.verify import verify_events
 def process_articles(articles):
     """
     Run the complete World Pulse v6 processing pipeline.
-
-    This layer only connects the existing processing modules.
     """
 
     if not isinstance(articles, list):
@@ -50,8 +49,39 @@ def process_articles(articles):
     for article in valid_articles:
         result = normalize_article(article)
 
-        if result and result.get("title"):
-            normalized.append(result)
+        if not result or not result.get("title"):
+            continue
+
+        facts = extract_facts(result)
+
+        enriched = dict(result)
+
+        enriched["event_types"] = facts.get(
+            "event_types",
+            [],
+        )
+        enriched["locations"] = facts.get(
+            "locations",
+            [],
+        )
+        enriched["actors"] = facts.get(
+            "actors",
+            [],
+        )
+        enriched["objects"] = facts.get(
+            "objects",
+            [],
+        )
+        enriched["numbers"] = facts.get(
+            "numbers",
+            [],
+        )
+        enriched["casualty_numbers"] = facts.get(
+            "casualty_numbers",
+            [],
+        )
+
+        normalized.append(enriched)
 
     if not normalized:
         return []

@@ -1,79 +1,143 @@
 """
-WORLD PULSE v6 - Ranking Layer
+WORLD PULSE v6 - Editorial Ranking Layer
 
-Combines objective intelligence with moderate verification
-and editorial adjustments.
+Ranks clustered events for editorial placement.
 
-Ranking does NOT modify intelligence or verification.
+Ranking is deliberately separate from:
+- extraction
+- clustering
+- verification
+- objective intelligence
+
+The score estimates editorial priority, not truth.
 """
 
-from copy import deepcopy
+from datetime import datetime, timezone
+from typing import Any
 
 
-EVENT_TYPE_MULTIPLIERS = {
-    "DIRECT_EVENT": 1.00,
-    "CASUALTY_EVENT": 1.00,
-    "MILITARY_ACTION": 1.00,
-    "NATURAL_DISASTER": 1.00,
-    "HUMANITARIAN_CRISIS": 1.00,
-    "MAJOR_POLICY_DECISION": 1.00,
-    "ECONOMIC_EVENT": 1.00,
-    "SECURITY_EVENT": 1.00,
-    "HEALTH_EVENT": 1.00,
-    "DIPLOMATIC_EVENT": 0.98,
-    "POLITICAL_EVENT": 0.97,
-    "TECHNOLOGY_EVENT": 0.98,
-    "BUSINESS_EVENT": 0.96,
-    "SCIENCE_EVENT": 0.96,
-    "POLITICAL_STATEMENT": 0.90,
-    "STATEMENT": 0.90,
-    "ANALYSIS": 0.82,
-    "FORECAST": 0.75,
-    "OPINION": 0.62,
-    "OTHER": 0.90,
-}
+def _safe_number(value: Any, default: float = 0.0) -> float:
+    if isinstance(value, bool):
+        return default
 
-
-EDITORIAL_CEILINGS = {
-    "DIRECT_EVENT": 100.0,
-    "CASUALTY_EVENT": 100.0,
-    "MILITARY_ACTION": 100.0,
-    "NATURAL_DISASTER": 100.0,
-    "HUMANITARIAN_CRISIS": 100.0,
-    "MAJOR_POLICY_DECISION": 100.0,
-    "ECONOMIC_EVENT": 100.0,
-    "SECURITY_EVENT": 100.0,
-    "HEALTH_EVENT": 100.0,
-    "DIPLOMATIC_EVENT": 89.99,
-    "POLITICAL_EVENT": 84.99,
-    "TECHNOLOGY_EVENT": 84.99,
-    "SCIENCE_EVENT": 79.99,
-    "BUSINESS_EVENT": 79.99,
-    "POLITICAL_STATEMENT": 59.99,
-    "STATEMENT": 59.99,
-    "ANALYSIS": 59.99,
-    "FORECAST": 54.99,
-    "OPINION": 49.99,
-    "OTHER": 54.99,
-}
-
-
-def _number(value, default=0.0):
     try:
         return float(value)
     except (TypeError, ValueError):
         return default
 
 
-def _int(value, default=0):
-    try:
-        return int(float(value))
-    except (TypeError, ValueError):
-        return default
+def _articles(event: Any) -> list[dict]:
+    if not isinstance(event, dict):
+        return []
+
+    value = event.get("articles")
+
+    if not isinstance(value, list):
+        return []
+
+    return [
+        article
+        for article in value
+        if isinstance(article, dict)
+    ]
 
 
-def _intelligence_score(event):
-    intelligence = event.get("intelligence", {})
+def _published_dates(event: dict) -> list[datetime]:
+    dates = []
+
+    for article in _articles(event):
+        value = article.get("published_at")
+
+        if not value:
+            continue
+
+        if isinstance(value, datetime):
+            dt = value
+        else:
+            text = str(value).strip()
+
+            if text.endswith("Z"):
+                text = text[:-1] + "+00:00"
+
+            try:
+                dt = datetime.fromisoformat(text)
+            except ValueError:
+                continue
+
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+
+        dates.append(dt)
+
+    return dates
+
+
+def freshness_score(event: dict, now: datetime | None = None) -> float:
+    """
+    Score how recent the event is.
+
+    0-100.
+    Unknown publication time receives a neutral score.
+    """
+
+    dates = _published_dates(event)
+
+    if not dates:
+        return 50.0
+
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+
+    latest = max(dates)
+
+    age_hours = max(
+        0.0,
+        (now - latest).total_seconds() / 3600.0,
+    )
+
+    if age_hours <= 1:
+        return 100.0
+
+    if age_hours <= 3:
+        return 90.0
+
+    if age_hours <= 6:
+        return 80.0
+
+    if age_hours <= 12:
+        return 65.0
+
+    if age_hours <= 24:
+        return 50.0
+
+    if age_hours <= 48:
+        return 30.0
+
+    return 10.0
+
+
+def _verification_score(event: dict) -> float:
+    verification = event.get("verification")
+
+    if not isinstance(verification, dict):
+        return 0.0
+
+    return max(
+        0.0,
+        min(
+            100.0,
+            _safe_number(
+                verification.get("verification_score")
+            ),
+        ),
+    )
+
+
+def _intelligence_score(event: dict) -> float:
+    intelligence = event.get("intelligence")
 
     if not isinstance(intelligence, dict):
         return 0.0
@@ -82,191 +146,160 @@ def _intelligence_score(event):
         0.0,
         min(
             100.0,
-            _number(intelligence.get("score"))
+            _safe_number(
+                intelligence.get("score")
+            ),
         ),
     )
 
 
-def _verification(event):
-    verification = event.get("verification", {})
-
-    if not isinstance(verification, dict):
-        return {}
-
-    return verification
+def _article_count(event: dict) -> int:
+    return len(_articles(event))
 
 
-def _verification_adjustment(event):
-    verification = _verification(event)
-
-    sources = _int(
-        verification.get("independent_sources")
-    )
-
-    agreement = _number(
-        verification.get("agreement")
-    )
-
-    diversity = _number(
-        verification.get("source_diversity_score")
-    )
-
-    if sources <= 0:
-        source_adjustment = -4.0
-    elif sources == 1:
-        source_adjustment = -3.5
-    elif sources == 2:
-        source_adjustment = -1.5
-    elif sources == 3:
-        source_adjustment = 0.0
-    elif sources == 4:
-        source_adjustment = 1.0
-    else:
-        source_adjustment = 1.5
-
-    if agreement >= 0.9:
-        agreement_adjustment = 1.0
-    elif agreement >= 0.8:
-        agreement_adjustment = 0.5
-    elif agreement >= 0.6:
-        agreement_adjustment = 0.0
-    elif agreement > 0:
-        agreement_adjustment = -1.0
-    else:
-        agreement_adjustment = -1.5
-
-    if diversity >= 8.0:
-        diversity_adjustment = 0.5
-    elif diversity >= 5.0:
-        diversity_adjustment = 0.0
-    elif diversity > 0:
-        diversity_adjustment = -0.5
-    else:
-        diversity_adjustment = 0.0
-
-    return max(
-        -5.0,
-        min(
-            3.0,
-            source_adjustment
-            + agreement_adjustment
-            + diversity_adjustment,
-        ),
-    )
-
-
-def _event_type(event):
-    value = event.get("event_type", "OTHER")
-
-    if not value:
-        return "OTHER"
-
-    return str(value).upper().strip()
-
-
-def _event_multiplier(event):
-    return EVENT_TYPE_MULTIPLIERS.get(
-        _event_type(event),
-        0.90,
-    )
-
-
-def _editorial_ceiling(event):
-    return EDITORIAL_CEILINGS.get(
-        _event_type(event),
-        54.99,
-    )
-
-
-def _article_adjustment(event):
-    articles = event.get("articles", [])
-
-    if not isinstance(articles, list):
-        return 0.0
-
-    count = len(articles)
-
-    if count >= 8:
-        return 0.25
-
-    if count >= 5:
-        return 0.15
-    if count >= 2:
-        return 0.0
-
-    return -0.25
-
-
-def calculate_ranking_score(event):
+def _scope_score(event: dict) -> float:
     """
-    Calculate final ranking score from 0 to 100.
+    Supporting editorial signal based on reporting breadth.
+    """
 
-    Intelligence is dominant.
-    Verification is a moderate adjustment.
-    Article volume is deliberately tiny.
+    count = _article_count(event)
+
+    if count <= 1:
+        return 20.0
+
+    if count == 2:
+        return 45.0
+
+    if count == 3:
+        return 65.0
+
+    if count <= 5:
+        return 80.0
+
+    return 90.0
+
+
+def editorial_score(
+    event: Any,
+    now: datetime | None = None,
+) -> float:
+    """
+    Calculate editorial priority from 0 to 100.
+
+    This is NOT a truth score.
+
+    Weighting:
+        intelligence  45%
+        verification  20%
+        freshness     20%
+        reporting     15%
     """
 
     if not isinstance(event, dict):
         return 0.0
 
     intelligence = _intelligence_score(event)
+    verification = _verification_score(event)
+    freshness = freshness_score(event, now)
+    scope = _scope_score(event)
 
-    score = intelligence * _event_multiplier(event)
-
-    score += _verification_adjustment(event)
-
-    score += _article_adjustment(event)
-
-    score = min(
-        score,
-        _editorial_ceiling(event),
+    score = (
+        intelligence * 0.45
+        + verification * 0.20
+        + freshness * 0.20
+        + scope * 0.15
     )
-
-    # Verification protection.
-    sources = _int(
-        _verification(event).get(
-            "independent_sources"
-        )
-    )
-
-    if sources <= 1:
-        score = min(score, 89.99)
-
-    elif sources == 2:
-        score = min(score, 89.99)
-
-    elif sources == 3:
-        score = min(score, 89.99)
 
     return round(
         max(0.0, min(100.0, score)),
         2,
     )
+def editorial_level(score: Any) -> str:
+    value = _safe_number(score)
+
+    if value >= 85:
+        return "FRONT_PAGE"
+    if value >= 70:
+        return "TOP_STORY"
+    if value >= 55:
+        return "IMPORTANT"
+    if value >= 40:
+        return "STANDARD"
+
+    return "LOW_PRIORITY"
 
 
-def ranking_significance(score):
-    value = _number(score)
-
-    if value >= 90:
-        return "CRITICAL"
-
-    if value >= 80:
-        return "VERY HIGH"
-
-    if value >= 65:
-        return "HIGH"
-
-    if value >= 50:
-        return "MEDIUM"
-
-    return "LOW"
-
-
-def rank_events(events):
+def is_breaking(event: Any, now: datetime | None = None) -> bool:
     """
-    Return events sorted by final ranking score.
+    Breaking means very recent + sufficiently important.
 
-    The input events are not modified.
+    Verification is intentionally not required here:
+    a major event may initially have only one source.
+    """
+
+    if not isinstance(event, dict):
+        return False
+
+    intelligence = _intelligence_score(event)
+    freshness = freshness_score(event, now)
+
+    return (
+        intelligence >= 65.0
+        and freshness >= 90.0
+    )
+
+
+def rank_event(
+    event: Any,
+    now: datetime | None = None,
+) -> dict:
+    """
+    Add editorial ranking metadata without modifying the original event.
+    """
+
+    if not isinstance(event, dict):
+        return {}
+
+    score = editorial_score(event, now)
+
+    result = dict(event)
+
+    result["ranking_score"] = score
+    result["ranking_significance"] = editorial_level(score)
+
+    result["ranking"] = {
+        "editorial_score": score,
+        "editorial_level": editorial_level(score),
+        "freshness_score": round(
+            freshness_score(event, now),
+            2,
+        ),
+        "intelligence_score": round(
+            _intelligence_score(event),
+            2,
+        ),
+        "verification_score": round(
+            _verification_score(event),
+            2,
+        ),
+        "scope_score": round(
+            _scope_score(event),
+            2,
+        ),
+        "breaking": is_breaking(event, now),
+    }
+
+    return result
+
+
+def rank_events(
+    events: Any,
+    now: datetime | None = None,
+) -> list[dict]:
+    """
+    Rank events from highest to lowest editorial priority.
+
+    Original event order is used as the deterministic tie-breaker.
     """
 
     if not isinstance(events, list):
@@ -274,27 +307,28 @@ def rank_events(events):
 
     ranked = []
 
-    for event in events:
+    for index, event in enumerate(events):
         if not isinstance(event, dict):
             continue
 
-        result = deepcopy(event)
+        result = rank_event(event, now)
 
-        score = calculate_ranking_score(result)
-
-        result["ranking_score"] = score
-        result["ranking_significance"] = (
-            ranking_significance(score)
+        score = result.get("ranking", {}).get(
+            "editorial_score",
+            0.0,
         )
 
-        ranked.append(result)
+        ranked.append(
+            (
+                -_safe_number(score),
+                index,
+                result,
+            )
+        )
 
-    ranked.sort(
-        key=lambda event: event.get(
-            "ranking_score",
-            0.0,
-        ),
-        reverse=True,
-    )
+    ranked.sort(key=lambda item: (item[0], item[1]))
 
-    return ranked
+    return [
+        result
+        for _, _, result in ranked
+    ]

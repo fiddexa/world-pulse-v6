@@ -31,11 +31,42 @@ def _safe_text(value: Any) -> str:
     return str(value).strip().lower()
 
 
+SOURCE_ALIASES = {
+    "reuters": "reuters",
+    "reuters news": "reuters",
+    "thomson reuters": "reuters",
+
+    "associated press": "ap",
+    "ap news": "ap",
+    "ap": "ap",
+
+    "agence france presse": "afp",
+    "afp": "afp",
+
+    "bbc news": "bbc",
+    "bbc world": "bbc",
+    "bbc": "bbc",
+
+    "un news": "un",
+    "un news centre": "un",
+    "un": "un",
+}
+
+
+def _canonical_source_name(value: Any) -> str:
+    name = _safe_text(value)
+
+    if not name:
+        return ""
+
+    return SOURCE_ALIASES.get(name, name)
+
+
 def _source_name(article: dict) -> str:
     if not isinstance(article, dict):
         return ""
 
-    return _safe_text(
+    return _canonical_source_name(
         article.get("source")
         or article.get("publisher")
         or article.get("source_name")
@@ -52,7 +83,31 @@ def _source_id(article: dict) -> str:
         or article.get("source")
     )
 
-    return _safe_text(value)
+    return _canonical_source_name(value)
+
+
+def _canonical_source(article: dict) -> str:
+    """Return a normalized publisher identity."""
+    source = _source_name(article)
+
+    aliases = {
+        "reuters": "reuters",
+        "reuters news": "reuters",
+        "thomson reuters": "reuters",
+        "associated press": "ap",
+        "ap news": "ap",
+        "ap": "ap",
+        "agence france presse": "afp",
+        "afp": "afp",
+        "bbc news": "bbc",
+        "bbc world": "bbc",
+        "bbc": "bbc",
+        "un news": "un",
+        "un news centre": "un",
+        "un": "un",
+    }
+
+    return aliases.get(source, source)
 
 
 def _relation(article: dict) -> str:
@@ -112,19 +167,13 @@ def same_source(a: dict, b: dict) -> bool:
     the same publisher.
     """
 
-    source_a = _source_id(a)
-    source_b = _source_id(b)
-
-    if source_a and source_b:
-        return source_a == source_b
-
-    name_a = _source_name(a)
-    name_b = _source_name(b)
+    source_a = _canonical_source(a)
+    source_b = _canonical_source(b)
 
     return bool(
-        name_a
-        and name_b
-        and name_a == name_b
+        source_a
+        and source_b
+        and source_a == source_b
     )
 
 
@@ -253,8 +302,8 @@ def count_independent_sources(
             continue
 
         source = (
-            _source_id(article)
-            or _source_name(article)
+            _canonical_source(article)
+            or _source_id(article)
         )
 
         if source:

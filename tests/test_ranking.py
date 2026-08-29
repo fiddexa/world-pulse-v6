@@ -1,203 +1,183 @@
+from datetime import datetime, timezone
+
 from pipeline.ranking import (
-    calculate_ranking_score,
-    ranking_significance,
+    editorial_level,
+    editorial_score,
+    freshness_score,
+    is_breaking,
+    rank_event,
     rank_events,
 )
 
 
-def make_event(
-    intelligence_score,
-    verification_level="MULTI_SOURCE",
-    independent_sources=2,
-    event_type="DIRECT_EVENT",
+NOW = datetime(
+    2026,
+    1,
+    1,
+    12,
+    0,
+    tzinfo=timezone.utc,
+)
+
+
+def event(
+    intelligence=50,
+    verification=50,
+    published_at="2026-01-01T11:00:00+00:00",
+    article_count=1,
 ):
+    articles = [
+        {
+            "title": f"Report {i}",
+            "source": f"Source {i}",
+            "published_at": published_at,
+        }
+        for i in range(article_count)
+    ]
+
     return {
-        "title": "Test event",
-        "articles": [
-            {
-                "title": "Test event",
-                "source": "Reuters",
-            }
-        ],
-        "event_type": event_type,
+        "articles": articles,
         "intelligence": {
-            "score": intelligence_score,
+            "score": intelligence,
         },
         "verification": {
-            "verification_level": verification_level,
-            "independent_sources": independent_sources,
-            "agreement": 0.8,
-            "source_diversity_score": 8.0,
-            "perspective_diversity": 7.0,
+            "verification_score": verification,
         },
     }
 
 
-def test_ranking_uses_intelligence():
-    low = make_event(30)
-    high = make_event(80)
-
-    assert calculate_ranking_score(high) > calculate_ranking_score(low)
-
-
-def test_verification_has_moderate_effect():
-    weak = make_event(
-        70,
-        verification_level="SINGLE_SOURCE",
-        independent_sources=1,
+def test_fresh_event_gets_high_freshness():
+    result = freshness_score(
+        event(
+            published_at="2026-01-01T11:30:00+00:00"
+        ),
+        NOW,
     )
 
-    strong = make_event(
-        70,
-        verification_level="WIDELY_CONFIRMED",
-        independent_sources=4,
+    assert result == 100.0
+
+
+def test_old_event_gets_low_freshness():
+    result = freshness_score(
+        event(
+            published_at="2025-12-29T12:00:00+00:00"
+        ),
+        NOW,
     )
 
-    difference = (
-        calculate_ranking_score(strong)
-        - calculate_ranking_score(weak)
+    assert result == 10.0
+
+
+def test_unknown_time_is_neutral():
+    result = freshness_score(
+        event(published_at=None),
+        NOW,
     )
 
-    assert difference > 0
-    assert difference < 15
-
-
-def test_single_source_cannot_be_critical():
-    event = make_event(
-        100,
-        verification_level="SINGLE_SOURCE",
-        independent_sources=1,
+    assert result == 50.0
+def test_high_impact_recent_event_has_high_editorial_score():
+    result = editorial_score(
+        event(
+            intelligence=95,
+            verification=90,
+            published_at="2026-01-01T11:30:00+00:00",
+            article_count=4,
+        ),
+        NOW,
     )
 
-    score = calculate_ranking_score(event)
-
-    assert score < 90
+    assert result >= 85.0
 
 
-def test_two_sources_cannot_be_critical():
-    event = make_event(
-        100,
-        verification_level="MULTI_SOURCE",
-        independent_sources=2,
+def test_editorial_score_is_not_same_as_intelligence():
+    result = editorial_score(
+        event(
+            intelligence=80,
+            verification=20,
+            published_at="2025-12-31T12:00:00+00:00",
+        ),
+        NOW,
     )
 
-    score = calculate_ranking_score(event)
-
-    assert score < 90
+    assert result != 80
 
 
-def test_three_sources_cannot_be_critical():
-    event = make_event(
-        100,
-        verification_level="MULTI_SOURCE",
-        independent_sources=3,
+def test_editorial_levels():
+    assert editorial_level(90) == "FRONT_PAGE"
+    assert editorial_level(75) == "TOP_STORY"
+    assert editorial_level(60) == "IMPORTANT"
+    assert editorial_level(45) == "STANDARD"
+    assert editorial_level(20) == "LOW_PRIORITY"
+
+
+def test_major_recent_event_is_breaking():
+    result = is_breaking(
+        event(
+            intelligence=80,
+            published_at="2026-01-01T11:30:00+00:00",
+        ),
+        NOW,
     )
 
-    score = calculate_ranking_score(event)
-
-    assert score < 90
+    assert result is True
 
 
-def test_real_event_can_reach_critical():
-    event = make_event(
-        100,
-        verification_level="WIDELY_CONFIRMED",
-        independent_sources=5,
+def test_old_event_is_not_breaking():
+    result = is_breaking(
+        event(
+            intelligence=100,
+            published_at="2025-12-30T12:00:00+00:00",
+        ),
+        NOW,
     )
 
-    score = calculate_ranking_score(event)
-
-    assert score >= 90
+    assert result is False
 
 
-def test_analysis_is_penalized():
-    direct = make_event(
-        80,
-        event_type="DIRECT_EVENT",
+def test_rank_event_does_not_modify_original():
+    original = event(
+        intelligence=80,
+        verification=70,
     )
 
-    analysis = make_event(
-        80,
-        event_type="ANALYSIS",
-    )
+    before = dict(original)
 
-    assert calculate_ranking_score(direct) > calculate_ranking_score(
-        analysis
-    )
+    result = rank_event(original, NOW)
+
+    assert original == before
+    assert "ranking" in result
 
 
-def test_forecast_is_penalized():
-    direct = make_event(
-        80,
-        event_type="DIRECT_EVENT",
-    )
-
-    forecast = make_event(
-        80,
-        event_type="FORECAST",
-    )
-
-    assert calculate_ranking_score(direct) > calculate_ranking_score(
-        forecast
-    )
-
-
-def test_opinion_is_strongly_penalized():
-    direct = make_event(
-        80,
-        event_type="DIRECT_EVENT",
-    )
-
-    opinion = make_event(
-        80,
-        event_type="OPINION",
-    )
-
-    assert calculate_ranking_score(direct) > calculate_ranking_score(
-        opinion
-    )
-
-
-def test_ranking_score_is_bounded():
-    event = make_event(100)
-
-    score = calculate_ranking_score(event)
-
-    assert 0 <= score <= 100
-
-
-def test_significance_comes_only_from_ranking_score():
-    assert ranking_significance(95) == "CRITICAL"
-    assert ranking_significance(80) == "VERY HIGH"
-    assert ranking_significance(65) == "HIGH"
-    assert ranking_significance(50) == "MEDIUM"
-    assert ranking_significance(49.99) == "LOW"
-
-
-def test_rank_events_orders_by_ranking_score():
+def test_rank_events_orders_highest_first():
     events = [
-        make_event(40),
-        make_event(90),
-        make_event(60),
+        event(intelligence=30, verification=30),
+        event(intelligence=95, verification=90),
+        event(intelligence=60, verification=60),
     ]
 
-    ranked = rank_events(events)
+    result = rank_events(events, NOW)
 
     scores = [
-        event["ranking_score"]
-        for event in ranked
+        item["ranking"]["editorial_score"]
+        for item in result
     ]
 
-    assert scores == sorted(
-        scores,
-        reverse=True,
-    )
+    assert scores == sorted(scores, reverse=True)
 
 
-def test_ranking_does_not_modify_intelligence_score():
-    event = make_event(75)
-    original = event["intelligence"]["score"]
+def test_rank_events_preserves_tie_order():
+    events = [
+        event(intelligence=50, verification=50),
+        event(intelligence=50, verification=50),
+    ]
 
-    calculate_ranking_score(event)
+    result = rank_events(events, NOW)
 
-    assert event["intelligence"]["score"] == original
+    assert result[0]["articles"][0]["title"] == "Report 0"
+    assert result[1]["articles"][0]["title"] == "Report 0"
+
+
+def test_invalid_input_is_safe():
+    assert rank_events(None, NOW) == []
+    assert rank_event(None, NOW) == {}
+    assert editorial_score(None, NOW) == 0.0
