@@ -12,6 +12,10 @@ This layer:
 """
 
 
+TELEGRAM = "telegram"
+WEBSITE = "website"
+
+
 BLOCKED_DECISIONS = {
     "REJECT",
     "EXCLUDE",
