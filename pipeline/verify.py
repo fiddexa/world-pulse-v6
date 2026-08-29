@@ -13,6 +13,8 @@ Verification is deliberately separate from:
 from collections import Counter
 from typing import Any
 
+from pipeline.source_chain import analyze_source_chain
+
 
 UNCONFIRMED = "UNCONFIRMED"
 SINGLE_SOURCE = "SINGLE_SOURCE"
@@ -302,6 +304,7 @@ def verify_event(event: Any) -> dict:
 
     sources = _sources(articles)
     source_groups = _source_groups(sources)
+    source_chain = analyze_source_chain(event)
 
     countries = _countries(articles)
     regions = _regions(articles)
@@ -312,13 +315,15 @@ def verify_event(event: Any) -> dict:
         articles,
     )
 
+    independent_source_count = source_chain["independent_sources"]
     level = verification_level(
-        len(source_groups),
+        independent_source_count,
         agreement,
     )
 
+
     score = _verification_score(
-        independent_source_count=len(source_groups),
+        independent_source_count=independent_source_count,
         agreement=agreement,
         source_diversity=len(source_groups),
         country_diversity=len(countries),
@@ -330,8 +335,9 @@ def verify_event(event: Any) -> dict:
         "verification_level": level,
         "verification_score": score,
         "sources": sources,
-        "independent_sources": len(source_groups),
+        "independent_sources": independent_source_count,
         "source_groups": source_groups,
+        "source_chain": source_chain,
         "countries": countries,
         "regions": regions,
         "categories": categories,
