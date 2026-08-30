@@ -199,20 +199,20 @@ def collect_feeds(
     articles = []
 
     for feed in feeds:
-
         if isinstance(feed, dict):
             url = feed.get("url")
             source = feed.get("source")
         else:
             url = feed
             source = None
-    articles.extend(
-                fetch_feed(
-                    url,
-                    source=source,
-                    timeout=timeout,
-                )
+
+        articles.extend(
+            fetch_feed(
+                url,
+                source=source,
+                timeout=timeout,
             )
+        )
 
     return articles
 
