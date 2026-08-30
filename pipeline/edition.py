@@ -10,6 +10,8 @@ organized into an edition.
 
 from typing import Any
 
+from pipeline.edition_id import build_edition_id
+
 
 SECTION_ORDER = (
     "world",
@@ -156,7 +158,11 @@ def _sort_key(event: dict) -> tuple:
     )
 
 
-def build_edition(events: Any) -> dict:
+def build_edition(
+    events: Any,
+    publication_date=None,
+    edition_time=None,
+) -> dict:
     """
     Build one deterministic edition structure.
 
@@ -205,7 +211,7 @@ def build_edition(events: Any) -> dict:
             [],
         ).append(event)
 
-    return {
+    result = {
         "edition_type": "WORLD_PULSE",
         "event_count": len(ordered),
         "top_story": top_story,
@@ -214,10 +220,28 @@ def build_edition(events: Any) -> dict:
         "sections": sections,
     }
 
+    if publication_date is not None and edition_time is not None:
+        result["edition_id"] = build_edition_id(
+            publication_date,
+            edition_time,
+        )
 
-def build_editions(events: Any) -> list[dict]:
+    return result
+
+
+def build_editions(
+    events: Any,
+    publication_date=None,
+    edition_time=None,
+) -> list[dict]:
     """
     Convenience wrapper for future multi-edition support.
     """
 
-    return [build_edition(events)]
+    return [
+        build_edition(
+            events,
+            publication_date=publication_date,
+            edition_time=edition_time,
+        )
+    ]
