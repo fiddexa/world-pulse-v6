@@ -14,7 +14,13 @@ def event():
             "published_at": "2026-08-29T10:00:00Z",
             "sources": ["bbc", "reuters"],
             "affected_areas": ["nepal"],
-        }
+        },
+        "publication": {
+            "telegram": "Major earthquake strikes Nepal",
+            "website": {
+                "headline": "Major earthquake strikes Nepal",
+            },
+        },
     }
 
 
@@ -209,3 +215,33 @@ def test_invalid_channel_does_not_create_record(tmp_path):
     ) is None
 
     log.close()
+
+
+def test_executor_with_sqlite_log_is_persistent(tmp_path):
+    from pipeline.delivery_executor import execute_delivery
+
+    db_path = tmp_path / "delivery.sqlite3"
+
+    first_log = SQLiteDeliveryLog(db_path)
+
+    first = execute_delivery(
+        event(),
+        TELEGRAM,
+        first_log,
+    )
+
+    assert first["status"] == SENT
+
+    first_log.close()
+
+    second_log = SQLiteDeliveryLog(db_path)
+
+    second = execute_delivery(
+        event(),
+        TELEGRAM,
+        second_log,
+    )
+
+    assert second["status"] == "SKIPPED"
+
+    second_log.close()

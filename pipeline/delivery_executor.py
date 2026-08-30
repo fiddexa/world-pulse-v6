@@ -38,9 +38,6 @@ def execution_status(
     Determine whether an event should be executed for a channel.
     """
 
-    if not isinstance(log, DeliveryLog):
-        raise TypeError("log must be a DeliveryLog")
-
     channel_policy = _channel_policy(
         event,
         channel,
