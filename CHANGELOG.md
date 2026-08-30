@@ -10,16 +10,145 @@ Current development continues toward fully autonomous production.
 
 ### Next Major Stage
 
-Persistent production state and stable Edition ID.
+Integration of Persistent Event Memory with the production edition flow.
 
 Planned work:
 
-- persistent SQLite delivery state;
-- stable Edition ID implementation;
-- persistent event memory;
-- integration with the production orchestrator;
-- restart-safe delivery;
-- duplicate-execution protection.
+- connect Event Memory with edition construction;
+- associate events with stable Edition IDs;
+- record event usage by edition;
+- define safe repeat-event handling;
+- integrate persistent event state into the production flow;
+- maintain restart-safe operation.
+
+---
+
+## 2026-08-30 — Article Pipeline to Edition Builder
+
+### Added
+
+Integrated the article processing pipeline with the WORLD PULSE edition builder.
+
+The new `build_edition_from_articles()` flow now connects:
+
+`Articles → process_articles() → build_edition()`
+
+The function accepts optional:
+
+- `publication_date`;
+- `edition_time`.
+
+When both values are supplied, a stable `Edition ID` is generated as part of the edition.
+
+### Tests
+
+Full project regression:
+
+`259 passed`
+
+### Commit
+
+`b28a2a8 connect article pipeline to edition builder`
+
+---
+
+## 2026-08-30 — Persistent Event Memory
+
+### Added
+
+- `pipeline/event_memory.py`
+- `tests/test_event_memory.py`
+
+### Implemented
+
+Persistent SQLite event memory using the existing canonical `event_fingerprint()` mechanism.
+
+The memory currently tracks:
+
+- deterministic event fingerprint;
+- first seen timestamp;
+- last seen timestamp;
+- occurrence count;
+- last associated Edition ID.
+
+Supported operations:
+
+- remember event;
+- check whether an event has been seen;
+- retrieve event memory;
+- forget an event;
+- clear event memory;
+- persistence across process restarts.
+
+Event Memory does not independently block publication of previously seen events.
+
+This allows the editorial system to distinguish event history from delivery idempotency and leaves future repeat-publication decisions to the editorial layer.
+
+### Tests
+
+Event Memory tests:
+
+`13 passed`
+
+Full project regression:
+
+`259 passed`
+
+### Commit
+
+`3178781 add persistent event memory`
+
+---
+
+## 2026-08-30 — Stable Edition ID
+
+### Added
+
+- `pipeline/edition_id.py`
+- `tests/test_edition_id.py`
+
+### Implemented
+
+Stable deterministic Edition ID generation.
+
+Edition identity is based on:
+
+- publication language;
+- publication date;
+- edition time.
+
+Current format:
+
+`WORLD-PULSE-EN-YYYY-MM-DD-HHMM`
+
+Example:
+
+`WORLD-PULSE-EN-2026-08-30-0700`
+
+The Edition Builder now accepts:
+
+- `publication_date`;
+- `edition_time`.
+
+When supplied, the resulting edition contains the stable `edition_id`.
+
+### Tests
+
+Edition ID tests:
+
+`11 passed`
+
+Edition integration tests:
+
+`23 passed`
+
+Full project regression after the integration:
+
+`246 passed`
+
+### Commit
+
+`08b5405 add stable edition id`
 
 ---
 
