@@ -233,3 +233,108 @@ def test_invalid_event_is_not_stored(tmp_path):
     assert memory.forget(None) is False
 
     memory.close()
+def test_edition_history_records_event_usage(tmp_path):
+    memory = EventMemory(
+        tmp_path / "events.sqlite3"
+    )
+
+    memory.remember(
+        event(),
+        edition_id="WORLD-PULSE-EN-2026-08-30-0700",
+    )
+
+    assert memory.edition_history(event()) == [
+        "WORLD-PULSE-EN-2026-08-30-0700"
+    ]
+
+    memory.close()
+
+
+def test_edition_history_keeps_multiple_editions(tmp_path):
+    memory = EventMemory(
+        tmp_path / "events.sqlite3"
+    )
+
+    memory.remember(
+        event(),
+        edition_id="WORLD-PULSE-EN-2026-08-30-0700",
+    )
+
+    memory.remember(
+        event(),
+        edition_id="WORLD-PULSE-EN-2026-08-30-1300",
+    )
+
+    memory.remember(
+        event(),
+        edition_id="WORLD-PULSE-EN-2026-08-30-2000",
+    )
+
+    assert memory.edition_history(event()) == [
+        "WORLD-PULSE-EN-2026-08-30-0700",
+        "WORLD-PULSE-EN-2026-08-30-1300",
+        "WORLD-PULSE-EN-2026-08-30-2000",
+    ]
+
+    memory.close()
+
+
+def test_same_event_is_not_duplicated_in_same_edition(tmp_path):
+    memory = EventMemory(
+        tmp_path / "events.sqlite3"
+    )
+
+    edition_id = "WORLD-PULSE-EN-2026-08-30-0700"
+
+    memory.remember(
+        event(),
+        edition_id=edition_id,
+    )
+
+    memory.remember(
+        event(),
+        edition_id=edition_id,
+    )
+
+    assert memory.edition_history(event()) == [
+        edition_id
+    ]
+
+    memory.close()
+
+
+def test_edition_history_survives_process_restart(tmp_path):
+    db_path = tmp_path / "events.sqlite3"
+
+    first_memory = EventMemory(db_path)
+
+    first_memory.remember(
+        event(),
+        edition_id="WORLD-PULSE-EN-2026-08-30-0700",
+    )
+
+    first_memory.remember(
+        event(),
+        edition_id="WORLD-PULSE-EN-2026-08-30-1300",
+    )
+
+    first_memory.close()
+
+    second_memory = EventMemory(db_path)
+
+    assert second_memory.edition_history(event()) == [
+        "WORLD-PULSE-EN-2026-08-30-0700",
+        "WORLD-PULSE-EN-2026-08-30-1300",
+    ]
+
+    assert second_memory.used_in_edition(
+        event(),
+        "WORLD-PULSE-EN-2026-08-30-0700",
+    ) is True
+
+    assert second_memory.used_in_edition(
+        event(),
+        "WORLD-PULSE-EN-2026-08-30-2000",
+    ) is False
+
+    second_memory.close()

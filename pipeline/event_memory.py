@@ -1,7 +1,7 @@
 """
 WORLD PULSE v6 - Persistent Event Memory
 
-Stores deterministic event memory in SQLite.
+Stores deterministic event memory and edition history in SQLite.
 
 Event identity is based on the existing event_fingerprint()
 from pipeline.delivery_log so the project has one canonical
@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from pipeline.delivery_log import event_fingerprint
+from pipeline.edition_id import build_edition_id
 
 
 class EventMemory:
@@ -25,7 +26,8 @@ class EventMemory:
     - occurrence_count;
     - last_edition_id.
 
-    Event identity is the existing SHA-256 event fingerprint.
+    A separate history table records every edition in which
+    an event was explicitly marked as used.
     """
 
     def __init__(
@@ -56,6 +58,17 @@ class EventMemory:
             """
         )
 
+        self._connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS event_edition_history (
+                fingerprint TEXT NOT NULL,
+                edition_id TEXT NOT NULL,
+                used_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (fingerprint, edition_id)
+            )
+            """
+        )
+
         self._connection.commit()
 
     def remember(
@@ -64,11 +77,14 @@ class EventMemory:
         edition_id: str | None = None,
     ) -> bool:
         """
-        Remember an event.
+        Remember that an event was observed.
 
         A new event is inserted with occurrence_count=1.
         An existing event updates last_seen and increments
         occurrence_count.
+
+        If edition_id is supplied, the event is also recorded
+        as used by that edition.
         """
 
         fingerprint = event_fingerprint(event)
@@ -108,6 +124,25 @@ class EventMemory:
                 edition_id,
             ),
         )
+
+        if edition_id is not None:
+            if not self._valid_edition_id(edition_id):
+                self._connection.rollback()
+                return False
+
+            self._connection.execute(
+                """
+                INSERT OR IGNORE INTO event_edition_history (
+                    fingerprint,
+                    edition_id
+                )
+                VALUES (?, ?)
+                """,
+                (
+                    fingerprint,
+                    edition_id,
+                ),
+            )
 
         self._connection.commit()
 
@@ -169,9 +204,60 @@ class EventMemory:
             "last_edition_id": row[4],
         }
 
+    def edition_history(self, event: Any) -> list[str]:
+        """
+        Return edition IDs in which the event was explicitly used.
+        """
+
+        fingerprint = event_fingerprint(event)
+
+        if not fingerprint:
+            return []
+
+        rows = self._connection.execute(
+            """
+            SELECT edition_id
+            FROM event_edition_history
+            WHERE fingerprint = ?
+            ORDER BY used_at ASC, edition_id ASC
+            """,
+            (fingerprint,),
+        ).fetchall()
+
+        return [row[0] for row in rows]
+
+    def used_in_edition(
+        self,
+        event: Any,
+        edition_id: str,
+    ) -> bool:
+        """
+        Return True when an event was explicitly used in an edition.
+        """
+
+        fingerprint = event_fingerprint(event)
+
+        if not fingerprint or not self._valid_edition_id(edition_id):
+            return False
+
+        row = self._connection.execute(
+            """
+            SELECT 1
+            FROM event_edition_history
+            WHERE fingerprint = ?
+              AND edition_id = ?
+            """,
+            (
+                fingerprint,
+                edition_id,
+            ),
+        ).fetchone()
+
+        return row is not None
+
     def forget(self, event: Any) -> bool:
         """
-        Remove an event from memory.
+        Remove an event and its edition history from memory.
         """
 
         fingerprint = event_fingerprint(event)
@@ -187,14 +273,26 @@ class EventMemory:
             (fingerprint,),
         )
 
+        self._connection.execute(
+            """
+            DELETE FROM event_edition_history
+            WHERE fingerprint = ?
+            """,
+            (fingerprint,),
+        )
+
         self._connection.commit()
 
         return cursor.rowcount > 0
 
     def clear(self) -> None:
         """
-        Remove all stored events.
+        Remove all stored events and edition history.
         """
+
+        self._connection.execute(
+            "DELETE FROM event_edition_history"
+        )
 
         self._connection.execute(
             "DELETE FROM event_memory"
@@ -208,3 +306,46 @@ class EventMemory:
         """
 
         self._connection.close()
+
+    @staticmethod
+    def _valid_edition_id(edition_id: Any) -> bool:
+        """
+        Validate the stable Edition ID format.
+
+        The ID is validated by parsing its canonical components.
+        """
+
+        if not isinstance(edition_id, str):
+            return False
+
+        parts = edition_id.split("-")
+
+        if len(parts) != 7:
+            return False
+
+        if parts[0] != "WORLD" or parts[1] != "PULSE":
+            return False
+
+        language = parts[2]
+        publication_date = "-".join(parts[3:6])
+        edition_time_raw = parts[6]
+
+        if len(edition_time_raw) != 4:
+            return False
+
+        edition_time = (
+            edition_time_raw[:2]
+            + ":"
+            + edition_time_raw[2:]
+        )
+
+        try:
+            expected = build_edition_id(
+                publication_date,
+                edition_time,
+                language=language,
+            )
+        except ValueError:
+            return False
+
+        return expected == edition_id
