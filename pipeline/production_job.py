@@ -20,7 +20,9 @@ Execution flow:
         ↓
     production job
         ↓
-    collect news from configured feeds
+    feed configuration
+        ↓
+    collect news
         ↓
     production scheduler
         ↓
@@ -35,6 +37,7 @@ from typing import Any
 from pipeline.collector import collect
 from pipeline.edition_memory import EditionMemory
 from pipeline.event_memory import EventMemory
+from pipeline.feed_config import get_feeds
 from pipeline.production_scheduler import run_scheduled_edition
 
 
@@ -51,7 +54,7 @@ def run_production_job(
     """
     Execute one production edition job.
 
-    Two input modes are supported.
+    Three input modes are supported.
 
     1. Supplied articles
 
@@ -63,15 +66,24 @@ def run_production_job(
     This mode is useful for tests, rehearsals and controlled
     execution.
 
-    2. Feed collection
+    2. Explicit feeds
 
         run_production_job(
             current_time=current_time,
             feeds=feeds,
         )
 
-    In this mode the job collects the current news from the
-    supplied RSS/Atom feeds before starting the edition.
+    In this mode the job collects news from the supplied
+    RSS/Atom feeds.
+
+    3. Production feed registry
+
+        run_production_job(
+            current_time=current_time,
+        )
+
+    In this mode the job automatically loads feeds from
+    pipeline.feed_config.get_feeds().
 
     The current time is supplied by the external execution
     environment. The job does not determine when it should run.
@@ -96,9 +108,7 @@ def run_production_job(
 
     if articles is None:
         if feeds is None:
-            raise ValueError(
-                "either articles or feeds must be supplied"
-            )
+            feeds = get_feeds()
 
         articles = collect(
             feeds,
