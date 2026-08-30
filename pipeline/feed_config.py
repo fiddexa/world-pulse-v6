@@ -3,67 +3,68 @@ WORLD PULSE v6 - Feed Configuration
 
 Production RSS/Atom feed configuration.
 
-This module contains technical feed endpoints and their
-operational requirements.
+This module contains technical feed endpoints only.
 
 Source reputation, tier, independence and category metadata
 remain in pipeline.sources.
 
-Only verified public endpoints should be placed in
-FEED_REGISTRY.
+Only verified public feeds are enabled.
 
-Sources requiring authentication or commercial syndication
-must not be represented as public RSS feeds.
+Sources without a verified production feed remain empty.
 """
 
 from copy import deepcopy
 
 
 FEED_REGISTRY = {
-    # Public / verified RSS sources.
+    "reuters": [],
+
+    "associated_press": [],
+
+    "bbc": [],
+
+    "afp": [],
+
     "un": [
         {
             "url": (
-                "https://www.un.org/en/ga/rss/"
-                "news.xml"
+                "https://news.un.org/"
+                "feed/subscribe/en/news/all/rss.xml"
             ),
-            "source": "United Nations",
+            "source": "UN",
+            "name": "UN News",
             "type": "rss",
             "requires_auth": False,
+            "category": "world",
         },
     ],
 
-    # IMF confirms official RSS availability.
-    # The exact production news feed endpoint should be
-    # verified before activation.
     "imf": [],
 
-    # Reuters RSS delivery is not treated as a public
-    # unauthenticated feed.
-    "reuters": [],
-
-    # AP distribution is not treated as a public
-    # unauthenticated feed.
-    "associated_press": [],
-
-    # BBC Information Syndication API requires an API key
-    # and an established syndication relationship.
-    "bbc": [],
-
-    # AFP distribution requires an appropriate commercial/API
-    # arrangement.
-    "afp": [],
-
     "world_bank": [],
+
     "who": [],
+
     "iea": [],
+
     "opec": [],
 }
 
 
-def get_feeds(
-    source=None,
-):
+def all_sources():
+    """
+    Return all registered source identifiers.
+
+    This includes sources that currently have no verified
+    production feed.
+    """
+
+    return list(
+        FEED_REGISTRY.keys()
+    )
+
+
+def get_feeds(source=None):
     """
     Return configured production feeds.
 
@@ -96,7 +97,7 @@ def get_feeds(
 def configured_sources():
     """
     Return source identifiers that currently have
-    production feed endpoints.
+    configured production feeds.
     """
 
     return [
@@ -106,28 +107,19 @@ def configured_sources():
     ]
 
 
-def all_sources():
-    """
-    Return all supported source identifiers.
-
-    This includes sources that currently have no public
-    production feed configured.
-    """
-
-    return list(
-        FEED_REGISTRY.keys()
-    )
-
-
-def source_requires_auth(
-    source,
-):
+def source_requires_auth(source):
     """
     Return True when at least one configured feed for the
     source requires authentication.
+
+    Unknown sources and sources without configured feeds
+    conservatively return False.
     """
 
     feeds = get_feeds(source)
+
+    if not feeds:
+        return False
 
     return any(
         bool(
