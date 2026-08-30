@@ -19,7 +19,7 @@ ranking
     ↓
 editorial
 """
-
+from pipeline.event_memory import EventMemory
 from pipeline.cluster import cluster_articles
 from pipeline.content import build_contents
 from pipeline.delivery import build_deliveries
@@ -124,6 +124,8 @@ def build_edition_from_articles(
     articles,
     publication_date=None,
     edition_time=None,
+    *,
+    event_memory=None,
 ):
     """
     Process articles and build a WORLD PULSE edition.
@@ -131,12 +133,31 @@ def build_edition_from_articles(
     The publication date and edition time are supplied by the
     caller so that autonomous scheduling can control edition
     identity explicitly.
+
+    When EventMemory is supplied and a stable Edition ID is
+    available,
+    events included in the edition are recorded in persistent
+    event
+    memory.
+
+    Event Memory does not block publication of previously seen events.
     """
 
     editorial = process_articles(articles)
 
-    return build_edition(
+    edition = build_edition(
         editorial,
         publication_date=publication_date,
         edition_time=edition_time,
     )
+
+    edition_id = edition.get("edition_id")
+
+    if event_memory is not None and edition_id:
+        for event in editorial:
+            event_memory.remember(
+                event,
+                edition_id=edition_id,
+            )
+
+    return edition
