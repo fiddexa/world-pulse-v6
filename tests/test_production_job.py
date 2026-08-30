@@ -182,6 +182,108 @@ def test_production_job_uses_injected_memory():
     event_memory.close()
 
 
+def test_production_job_collects_from_feeds(monkeypatch):
+    edition_memory = EditionMemory(":memory:")
+    event_memory = EventMemory(":memory:")
+
+    collected = articles()
+
+    def fake_collect(feeds, timeout=15):
+        assert feeds == [
+            {
+                "url": "https://example.com/feed.xml",
+                "source": "Example",
+            }
+        ]
+        assert timeout == 30
+
+        return collected
+
+    monkeypatch.setattr(
+        "pipeline.production_job.collect",
+        fake_collect,
+    )
+
+    result = run_production_job(
+        current_time=datetime(
+            2026,
+            8,
+            30,
+            13,
+            45,
+        ),
+        feeds=[
+            {
+                "url": "https://example.com/feed.xml",
+                "source": "Example",
+            }
+        ],
+        timeout=30,
+        edition_memory=edition_memory,
+        event_memory=event_memory,
+    )
+
+    assert result["status"] == COMPLETED_RESULT
+    assert result["edition_id"] == (
+        "WORLD-PULSE-EN-2026-08-30-1300"
+    )
+
+    edition_memory.close()
+    event_memory.close()
+
+
+def test_production_job_rejects_articles_and_feeds_together():
+    edition_memory = EditionMemory(":memory:")
+    event_memory = EventMemory(":memory:")
+
+    with pytest.raises(
+        ValueError,
+        match="articles and feeds cannot be supplied together",
+    ):
+        run_production_job(
+            articles(),
+            datetime(
+                2026,
+                8,
+                30,
+                13,
+                0,
+            ),
+            feeds=[
+                "https://example.com/feed.xml"
+            ],
+            edition_memory=edition_memory,
+            event_memory=event_memory,
+        )
+
+    edition_memory.close()
+    event_memory.close()
+
+
+def test_production_job_requires_articles_or_feeds():
+    edition_memory = EditionMemory(":memory:")
+    event_memory = EventMemory(":memory:")
+
+    with pytest.raises(
+        ValueError,
+        match="either articles or feeds must be supplied",
+    ):
+        run_production_job(
+            current_time=datetime(
+                2026,
+                8,
+                30,
+                13,
+                0,
+            ),
+            edition_memory=edition_memory,
+            event_memory=event_memory,
+        )
+
+    edition_memory.close()
+    event_memory.close()
+
+
 def test_production_job_rejects_invalid_current_time():
     edition_memory = EditionMemory(":memory:")
     event_memory = EventMemory(":memory:")
