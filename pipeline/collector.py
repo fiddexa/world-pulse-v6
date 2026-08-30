@@ -1,3 +1,4 @@
+import gzip
 
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -158,6 +159,9 @@ def fetch_feed(
             timeout=timeout,
         ) as response:
             data = response.read()
+
+        if data[:2] == b"\x1f\x8b":
+            data = gzip.decompress(data)
 
         root = ET.fromstring(data)
 

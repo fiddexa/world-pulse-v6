@@ -4,6 +4,7 @@ from pipeline.telegram_runner import (
     publish_events_to_telegram,
 )
 from pipeline.publisher import MockPublisher
+from pipeline.sqlite_delivery_log import SQLiteDeliveryLog
 
 
 def event():
@@ -130,7 +131,10 @@ def test_runner_handles_batch(monkeypatch):
     assert len(publisher.published) == 2
 
 
-def test_batch_reuses_same_log(monkeypatch):
+def test_batch_reuses_same_log(
+    monkeypatch,
+    tmp_path,
+):
     from pipeline import telegram_runner
 
     publisher = MockPublisher(TELEGRAM)
@@ -141,15 +145,22 @@ def test_batch_reuses_same_log(monkeypatch):
         lambda: publisher,
     )
 
+    log = SQLiteDeliveryLog(
+        tmp_path / "telegram.sqlite3"
+    )
+
     item = event()
 
     results = publish_events_to_telegram(
         [item, item],
+        log=log,
     )
 
     assert results[0]["status"] == "SENT"
     assert results[1]["status"] == "SKIPPED"
     assert len(publisher.published) == 1
+
+    log.close()
 
 
 def test_non_list_batch_is_safe():

@@ -5,16 +5,38 @@ Explicit production entry point for Telegram delivery.
 
 This module is intentionally separate from process_articles():
 normal processing must never publish externally by accident.
+
+Production delivery uses persistent SQLite delivery memory by
+default so SENT/FAILED state survives process restarts.
+
+Tests and controlled execution may inject another DeliveryLog.
 """
 
 from pipeline.delivery_executor import execute_delivery
 from pipeline.delivery_log import DeliveryLog, TELEGRAM
+from pipeline.sqlite_delivery_log import SQLiteDeliveryLog
 from pipeline.telegram_factory import get_telegram_publisher
+
+
+DEFAULT_DELIVERY_LOG_PATH = "data/telegram_delivery.sqlite3"
+
+
+def _get_default_log():
+    """
+    Return the persistent production delivery log.
+    """
+
+    return SQLiteDeliveryLog(
+        DEFAULT_DELIVERY_LOG_PATH
+    )
 
 
 def publish_event_to_telegram(event, *, log=None):
     """
     Publish one prepared event to Telegram.
+
+    When log is omitted, persistent SQLite delivery memory
+    is used.
 
     Returns the executor result.
     """
@@ -27,7 +49,7 @@ def publish_event_to_telegram(event, *, log=None):
         }
 
     if log is None:
-        log = DeliveryLog()
+        log = _get_default_log()
 
     publisher = get_telegram_publisher()
 
@@ -49,15 +71,18 @@ def publish_events_to_telegram(events, *, log=None):
     """
     Publish a list of prepared events.
 
-    Uses one DeliveryLog for the whole batch so duplicate
+    Uses one delivery log for the whole batch so duplicate
     protection works across all events in the batch.
+
+    When log is omitted, persistent SQLite delivery memory
+    is used.
     """
 
     if not isinstance(events, list):
         return []
 
     if log is None:
-        log = DeliveryLog()
+        log = _get_default_log()
 
     results = []
 

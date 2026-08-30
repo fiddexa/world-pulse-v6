@@ -237,3 +237,60 @@ def test_collect_feeds_invalid_input_returns_empty():
     assert collect_feeds(
         "https://example.com/feed.xml"
     ) == []
+
+def test_fetch_feed_supports_gzip_response(
+    monkeypatch,
+):
+    import gzip
+
+    from io import BytesIO
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(
+            self,
+            exc_type,
+            exc_value,
+            traceback,
+        ):
+            return False
+
+        def read(self):
+            xml = b"""
+            <rss version="2.0">
+                <channel>
+                    <item>
+                        <title>GZIP Test Article</title>
+                        <description>Test summary</description>
+                        <pubDate>Tue, 25 Aug 2026 10:00:00 GMT</pubDate>
+                        <link>https://example.com/gzip</link>
+                    </item>
+                </channel>
+            </rss>
+            """
+
+            return gzip.compress(xml)
+
+    def fake_urlopen(
+        request,
+        timeout=15,
+    ):
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        "pipeline.collector.urlopen",
+        fake_urlopen,
+    )
+
+    result = fetch_feed(
+        "https://example.com/feed.xml",
+        source="Test",
+    )
+
+    assert len(result) == 1
+    assert result[0]["title"] == (
+        "GZIP Test Article"
+    )
+    assert result[0]["source"] == "Test"
