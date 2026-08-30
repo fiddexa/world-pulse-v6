@@ -97,3 +97,87 @@ def test_run_edition_uses_supplied_memory():
     )
 
     memory.close()
+def test_run_edition_resolves_slot_from_current_time():
+    from datetime import datetime
+
+    memory = EventMemory(":memory:")
+
+    edition = run_edition(
+        articles(),
+        current_time=datetime(
+            2026,
+            8,
+            30,
+            13,
+            45,
+        ),
+        event_memory=memory,
+    )
+
+    assert edition["edition_id"] == (
+        "WORLD-PULSE-EN-2026-08-30-1300"
+    )
+
+    memory.close()
+
+
+def test_run_edition_resolves_previous_day_before_first_slot():
+    from datetime import datetime
+
+    memory = EventMemory(":memory:")
+
+    edition = run_edition(
+        articles(),
+        current_time=datetime(
+            2026,
+            8,
+            30,
+            6,
+            59,
+        ),
+        event_memory=memory,
+    )
+
+    assert edition["edition_id"] == (
+        "WORLD-PULSE-EN-2026-08-29-2000"
+    )
+
+    memory.close()
+
+
+def test_run_edition_rejects_mixed_resolution_modes():
+    from datetime import datetime
+    import pytest
+
+    memory = EventMemory(":memory:")
+
+    with pytest.raises(ValueError):
+        run_edition(
+            articles(),
+            "2026-08-30",
+            "13:00",
+            current_time=datetime(
+                2026,
+                8,
+                30,
+                13,
+                45,
+            ),
+            event_memory=memory,
+        )
+
+    memory.close()
+
+
+def test_run_edition_requires_edition_identity():
+    import pytest
+
+    memory = EventMemory(":memory:")
+
+    with pytest.raises(ValueError):
+        run_edition(
+            articles(),
+            event_memory=memory,
+        )
+
+    memory.close()
