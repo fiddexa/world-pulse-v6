@@ -23,6 +23,7 @@ editorial
 from pipeline.cluster import cluster_articles
 from pipeline.content import build_contents
 from pipeline.delivery import build_deliveries
+from pipeline.edition import build_edition
 from pipeline.editorial import decide_events
 from pipeline.extract import extract_facts
 from pipeline.intelligence import analyze_events
@@ -119,9 +120,23 @@ def process_articles(articles):
     return delivery
 
 
-def build_edition_from_articles(articles):
+def build_edition_from_articles(
+    articles,
+    publication_date=None,
+    edition_time=None,
+):
     """
     Process articles and build a WORLD PULSE edition.
+
+    The publication date and edition time are supplied by the
+    caller so that autonomous scheduling can control edition
+    identity explicitly.
     """
 
     editorial = process_articles(articles)
+
+    return build_edition(
+        editorial,
+        publication_date=publication_date,
+        edition_time=edition_time,
+    )
