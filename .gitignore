@@ -4,3 +4,4 @@ pycache/
 .venv/
 venv/
 .env
+data/
