@@ -73,6 +73,8 @@ def test_pipeline_does_not_crash_on_invalid_items():
     events = process_articles(articles)
 
     assert isinstance(events, list)
+
+
 def test_build_edition_from_articles_records_events_in_memory(tmp_path):
     from pipeline.app import build_edition_from_articles
     from pipeline.event_memory import EventMemory
@@ -119,9 +121,9 @@ def test_build_edition_from_articles_records_events_in_memory(tmp_path):
 
     if event is None:
         event = (
-        edition["main_stories"]
-        + edition["briefs"]
-    )[0]
+            edition["main_stories"]
+            + edition["briefs"]
+        )[0]
 
     assert memory.has_seen(event) is True
 
@@ -156,3 +158,73 @@ def test_build_edition_from_articles_does_not_require_event_memory():
     assert edition["edition_id"] == (
         "WORLD-PULSE-EN-2026-08-30-1300"
     )
+
+
+def test_process_articles_excludes_information_after_snapshot():
+    articles = [
+        {
+            "title": "Known before seven",
+            "published_at": "2026-08-30T06:50:00Z",
+            "first_seen_at": "2026-08-30T06:55:00Z",
+            "source": "Reuters",
+        },
+        {
+            "title": "Discovered at seven twenty",
+            "published_at": "2026-08-30T07:20:00Z",
+            "first_seen_at": "2026-08-30T07:20:00Z",
+            "source": "BBC",
+        },
+    ]
+
+    events = process_articles(
+        articles,
+        editorial_time="2026-08-30T07:00:00Z",
+    )
+
+    titles = [
+        article["title"]
+        for event in events
+        for article in event.get("articles", [])
+    ]
+
+    assert "Known before seven" in titles
+    assert "Discovered at seven twenty" not in titles
+
+
+def test_build_edition_uses_publication_slot_as_snapshot_boundary():
+    from pipeline.app import build_edition_from_articles
+
+    articles = [
+        {
+            "title": "Known before seven",
+            "published_at": "2026-08-30T06:50:00Z",
+            "first_seen_at": "2026-08-30T06:55:00Z",
+            "source": "Reuters",
+        },
+        {
+            "title": "Known after seven",
+            "published_at": "2026-08-30T07:20:00Z",
+            "first_seen_at": "2026-08-30T07:20:00Z",
+            "source": "BBC",
+        },
+    ]
+
+    edition = build_edition_from_articles(
+        articles,
+        publication_date="2026-08-30",
+        edition_time="07:00",
+    )
+
+    titles = [
+        article["title"]
+        for event in (
+            [edition["top_story"]]
+            + edition["main_stories"]
+            + edition["briefs"]
+        )
+        if event is not None
+        for article in event.get("articles", [])
+    ]
+
+    assert "Known before seven" in titles
+    assert "Known after seven" not in titles
