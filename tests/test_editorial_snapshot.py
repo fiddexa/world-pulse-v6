@@ -5,6 +5,7 @@ from pipeline.editorial_snapshot import (
     SNAPSHOT_EXCLUDED,
     SNAPSHOT_UNKNOWN,
     annotate_snapshot,
+    filter_events_for_snapshot,
     first_known_at,
     is_snapshot_eligible,
     last_known_at,
@@ -146,6 +147,46 @@ def test_first_and_last_known_times_use_first_seen_tier():
     assert last_known_at(item) == datetime(
         2026, 8, 30, 8, 10, tzinfo=timezone.utc
     )
+
+
+def test_filter_events_for_snapshot_excludes_late_information():
+    events = [
+        event(first_seen_at="2026-08-30T06:50:00Z"),
+        event(first_seen_at="2026-08-30T07:20:00Z"),
+    ]
+
+    result = filter_events_for_snapshot(events, SNAPSHOT_0700)
+
+    assert len(result) == 1
+    assert result[0]["articles"][0]["first_seen_at"] == (
+        "2026-08-30T06:50:00Z"
+    )
+
+
+def test_filter_events_for_snapshot_excludes_unknown_by_default():
+    events = [
+        event(first_seen_at="2026-08-30T06:50:00Z"),
+        {"articles": [{"title": "Unknown availability"}]},
+    ]
+
+    result = filter_events_for_snapshot(events, SNAPSHOT_0700)
+
+    assert len(result) == 1
+
+
+def test_filter_events_for_snapshot_can_include_unknown_for_compatibility():
+    events = [
+        event(first_seen_at="2026-08-30T06:50:00Z"),
+        {"articles": [{"title": "Unknown availability"}]},
+    ]
+
+    result = filter_events_for_snapshot(
+        events,
+        SNAPSHOT_0700,
+        include_unknown=True,
+    )
+
+    assert len(result) == 2
 
 
 def test_annotate_snapshot_does_not_modify_original():
