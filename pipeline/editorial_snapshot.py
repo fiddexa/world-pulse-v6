@@ -63,52 +63,59 @@ def _articles(event: Any) -> list[dict]:
     ]
 
 
-def _availability_dates(event: dict) -> list[datetime]:
-    """
-    Return known WORLD PULSE availability timestamps.
-
-    Preferred order of evidence:
-
-    1. event.first_seen_at
-    2. article.first_seen_at
-    3. article.available_at
-    4. article.published_at
-
-    published_at is a compatibility fallback for existing source data.
-    New production ingestion should populate first_seen_at whenever
-    the collection layer can establish it.
-    """
-
+def _timestamp_group(event: dict, key: str) -> list[datetime]:
     dates: list[datetime] = []
 
-    direct = _parse_datetime(event.get("first_seen_at"))
-    if direct is not None:
-        dates.append(direct)
-
-    direct = _parse_datetime(event.get("available_at"))
+    direct = _parse_datetime(event.get(key))
     if direct is not None:
         dates.append(direct)
 
     for article in _articles(event):
-        for key in (
-            "first_seen_at",
-            "available_at",
-            "published_at",
-        ):
-            value = _parse_datetime(article.get(key))
-            if value is not None:
-                dates.append(value)
+        value = _parse_datetime(article.get(key))
+        if value is not None:
+            dates.append(value)
 
     return dates
 
 
+def _availability_dates(event: dict) -> list[datetime]:
+    """
+    Return the best available WORLD PULSE information timestamps.
+
+    Timestamp precedence is deliberate:
+
+    1. first_seen_at
+    2. available_at
+    3. published_at
+
+    Lower-priority timestamps are not mixed into a higher-priority
+    group. This prevents an old published_at value from contradicting
+    an explicit first_seen_at value.
+    """
+
+    for key in (
+        "first_seen_at",
+        "available_at",
+        "published_at",
+    ):
+        dates = _timestamp_group(event, key)
+        if dates:
+            return dates
+
+    return []
+
+
 def first_known_at(event: Any) -> datetime | None:
     """
-    Return the earliest known time at which the event was available.
+    Return the earliest timestamp from the highest available
+    information-availability tier.
 
     This is deliberately different from event_time. An event may occur
     before WORLD PULSE receives reliable information about it.
     """
+
+    if not isinstance(event, dict):
+        return None
 
     dates = _availability_dates(event)
     if not dates:
@@ -118,7 +125,10 @@ def first_known_at(event: Any) -> datetime | None:
 
 
 def last_known_at(event: Any) -> datetime | None:
-    """Return the latest known source-information timestamp."""
+    """Return the latest timestamp from the selected availability tier."""
+
+    if not isinstance(event, dict):
+        return None
 
     dates = _availability_dates(event)
     if not dates:
@@ -180,6 +190,10 @@ def annotate_snapshot(
     if not isinstance(event, dict):
         return {}
 
+    snapshot = _parse_datetime(editorial_time)
+    if snapshot is None:
+        raise ValueError("editorial_time must be a valid datetime")
+
     result = dict(event)
     status = snapshot_status(event, editorial_time)
     known = first_known_at(event)
@@ -187,7 +201,7 @@ def annotate_snapshot(
 
     result["editorial_snapshot"] = {
         "status": status,
-        "editorial_time": _parse_datetime(editorial_time).isoformat(),
+        "editorial_time": snapshot.isoformat(),
         "first_known_at": known.isoformat() if known else None,
         "last_known_at": updated.isoformat() if updated else None,
     }
