@@ -97,6 +97,19 @@ def test_event_level_first_seen_takes_precedence_over_article_times():
     assert snapshot_status(item, SNAPSHOT_0700) == SNAPSHOT_ELIGIBLE
 
 
+def test_event_level_first_seen_can_exclude_despite_older_article_publication():
+    item = {
+        "first_seen_at": "2026-08-30T07:20:00Z",
+        "articles": [
+            {
+                "published_at": "2026-08-30T06:00:00Z",
+            }
+        ],
+    }
+
+    assert snapshot_status(item, SNAPSHOT_0700) == SNAPSHOT_EXCLUDED
+
+
 def test_published_at_is_compatibility_fallback():
     item = event(
         first_seen_at=None,
@@ -113,7 +126,7 @@ def test_missing_availability_is_unknown():
     assert is_snapshot_eligible(item, SNAPSHOT_0700) is False
 
 
-def test_first_and_last_known_times_are_exposed():
+def test_first_and_last_known_times_use_first_seen_tier():
     item = {
         "articles": [
             {
@@ -128,7 +141,7 @@ def test_first_and_last_known_times_are_exposed():
     }
 
     assert first_known_at(item) == datetime(
-        2026, 8, 30, 7, 15, tzinfo=timezone.utc
+        2026, 8, 30, 7, 20, tzinfo=timezone.utc
     )
     assert last_known_at(item) == datetime(
         2026, 8, 30, 8, 10, tzinfo=timezone.utc
