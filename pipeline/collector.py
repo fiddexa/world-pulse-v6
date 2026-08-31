@@ -74,7 +74,7 @@ def _items(root):
     return result
 
 
-def _extract_article(item, source):
+def _extract_article(item, source, *, first_seen_at=None):
     title = _text(
         _child(item, {"title"})
     )
@@ -113,13 +113,18 @@ def _extract_article(item, source):
         _text(date_element)
     )
 
-    return {
+    result = {
         "title": title,
         "summary": summary,
         "source": source,
         "url": url,
         "published_at": published_at,
     }
+
+    if first_seen_at is not None:
+        result["first_seen_at"] = first_seen_at
+
+    return result
 
 
 def fetch_feed(
@@ -160,6 +165,8 @@ def fetch_feed(
         ) as response:
             data = response.read()
 
+        first_seen_at = datetime.now(timezone.utc).isoformat()
+
         if data[:2] == b"\x1f\x8b":
             data = gzip.decompress(data)
 
@@ -182,6 +189,7 @@ def fetch_feed(
         article = _extract_article(
             item,
             source,
+            first_seen_at=first_seen_at,
         )
 
         if article["title"]:
