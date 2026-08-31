@@ -3,7 +3,9 @@
 **MINIMUM TEXT. MAXIMUM MEANING.**  
 **FACTS FIRST. CONTEXT SECOND.**
 
-WORLD PULSE is an automated international news publication system designed to transform verified global news into concise, neutral and contextualized newspaper-style editions.
+WORLD PULSE is an automated international news publication system designed to transform verified global information into concise, neutral and contextualized newspaper-style editions.
+
+WORLD PULSE is **not a headline aggregator**. International sources provide the information used by the system; the final product is an independently formed WORLD PULSE editorial view of the world at a specific publication moment.
 
 ---
 
@@ -21,6 +23,111 @@ WORLD PULSE is an automated international news publication system designed to tr
 
 ---
 
+## Editorial Snapshot Model
+
+The three daily editions are **three independent editorial decisions**, not three automatic re-publications of the same news feed.
+
+```text
+07:00 → NEW INFORMATION SNAPSHOT → WORLD PULSE 07:00
+13:00 → NEW INFORMATION SNAPSHOT → WORLD PULSE 13:00
+20:00 → NEW INFORMATION SNAPSHOT → WORLD PULSE 20:00
+```
+
+Before each edition, WORLD PULSE must collect and process the information available from its configured international sources and determine what is most important for the world audience at that moment.
+
+The central editorial question is:
+
+> **What do we know by the time of this edition, and which of the known events are most important to the global audience right now?**
+
+### The system does not use a rigid "last N hours" rule
+
+Publication time from a source is only one signal. WORLD PULSE must not automatically use rules such as:
+
+- include everything published within 6 hours;
+- exclude everything older than 24 hours;
+- include everything published before a fixed hour.
+
+Freshness is an input to editorial evaluation, not the editorial decision itself.
+
+### Four different time concepts
+
+Where possible, the system should distinguish:
+
+- `event_time` — when the event happened;
+- `published_at` — when a source published a report;
+- `first_seen_at` — when WORLD PULSE first received the information;
+- `last_updated_at` — when significant new information became available;
+- `editorial_time` — the time used for the edition's editorial snapshot.
+
+These timestamps must not be treated as interchangeable.
+
+### Late information example
+
+If an earthquake occurs at 05:30 but the first relevant source report becomes available to WORLD PULSE at 07:20:
+
+```text
+07:00 snapshot → information not yet available → cannot be selected
+13:00 snapshot → information is available → may be selected
+```
+
+Selection at 13:00 still depends on verification, significance, current relevance and competition with other events.
+
+### Re-evaluation across editions
+
+The same event may be considered again in a later edition. Previous publication does not automatically suppress future editorial evaluation.
+
+A continuing event may become more or less important depending on:
+
+- new facts;
+- new confirmations;
+- changing casualty or damage information;
+- new official statements;
+- international reaction;
+- escalation or de-escalation;
+- other meaningful developments.
+
+Event Memory provides historical context and duplicate awareness; it must not become a blanket ban on reconsidering a previously seen event.
+
+### Own editorial product
+
+WORLD PULSE uses source material as input and independently forms:
+
+- the headline;
+- the summary;
+- the editorial priority;
+- the section assignment;
+- the structure of the edition.
+
+The system should combine and compare multiple reports about the same event rather than treating every source headline as a separate final story.
+
+```text
+INFORMATION FROM OUR SOURCES
+            ↓
+COLLECTION
+            ↓
+NORMALIZATION / FACT EXTRACTION
+            ↓
+EVENT CLUSTERING
+            ↓
+CROSS-SOURCE VERIFICATION
+            ↓
+CURRENT EVENT ANALYSIS
+            ↓
+EDITORIAL SNAPSHOT
+            ↓
+RANKING / EDITORIAL SELECTION
+            ↓
+WORLD PULSE HEADLINE + SUMMARY
+            ↓
+WORLD PULSE EDITION
+```
+
+**Each edition = new information collection + new analysis + new editorial decision.**
+
+The previous edition is historical context, not the template for the next edition.
+
+---
+
 ## Core Pipeline
 
 ```text
@@ -35,6 +142,8 @@ Clustering
 Verification
       ↓
 Intelligence / Context
+      ↓
+Editorial Snapshot
       ↓
 Ranking
       ↓
@@ -125,7 +234,8 @@ Each event may be evaluated using:
 - Global Impact;
 - Momentum;
 - International Reach;
-- Editorial Significance.
+- Editorial Significance;
+- Current relevance to the edition snapshot.
 
 A single event may be relevant to multiple editorial directions but should not be published multiple times simply because it belongs to multiple sections.
 
@@ -142,7 +252,8 @@ It prioritizes the most important stories of each edition according to factors s
 - Momentum;
 - Source Confidence;
 - International Reach;
-- Editorial Significance.
+- Editorial Significance;
+- relevance at the current Editorial Snapshot.
 
 The Front Page is not a mechanical list of every story.
 
@@ -322,6 +433,8 @@ The system must be able to recognize:
 
 Event memory must survive process restarts.
 
+Event Memory must not prevent a previously seen event from being evaluated again for a later Editorial Snapshot.
+
 ---
 
 ## Delivery Architecture
@@ -401,32 +514,21 @@ The following components have been implemented and tested:
 - Telegram HTTP transport;
 - Telegram publisher factory;
 - Telegram production runner;
-- production orchestrator.
+- production orchestrator;
+- edition slot resolution;
+- persistent Edition Memory;
+- persistent Event Memory;
+- edition-level Telegram delivery;
+- production edition delivery;
+- Editorial Snapshot timing passed through production execution.
 
 Latest recorded full regression:
 
 ```text
-226 passed
+393 passed
 ```
 
-Real Telegram delivery:
-
-```text
-STATUS: SENT
-CHANNEL: telegram
-MESSAGE_ID: 29
-REAL TELEGRAM TEST: SUCCESS
-```
-
-Idempotency test:
-
-```text
-FIRST: SENT
-FIRST MESSAGE_ID: 30
-SECOND: SKIPPED
-LOG: SENT
-IDEMPOTENCY TEST: SUCCESS
-```
+Real Telegram delivery has been verified successfully with the production bot and channel configuration.
 
 ---
 
@@ -434,29 +536,26 @@ IDEMPOTENCY TEST: SUCCESS
 
 The major remaining production stages are:
 
-1. Persistent SQLite delivery state.
-2. Stable Edition ID implementation.
-3. Persistent event memory.
-4. Production Source Registry.
-5. Source Reputation implementation.
-6. Source Independence implementation.
-7. Complete editorial priority engine.
-8. Production Edition Builder.
-9. Front Page Engine.
-10. Full dynamic Layout Engine.
-11. Production Visual Engine.
-12. Full Audio Edition generation.
-13. Audio Quality Control.
-14. Audio + Text publication package.
-15. Autonomous edition runner.
-16. Production scheduler.
-17. Hosted production deployment.
-18. Monitoring and alerting.
-19. Failure recovery.
-20. Controlled retry system.
-21. Complete end-to-end Quality Control.
-22. Full production rehearsal.
-23. Autonomous launch.
+1. Production Source Registry expansion.
+2. Source Reputation implementation.
+3. Source Independence implementation.
+4. Editorial Snapshot eligibility based on information availability.
+5. `first_seen_at` / `last_updated_at` event-state tracking where source data permits it.
+6. Final editorial relevance and priority calibration for real-world news.
+7. Production Edition Builder hardening.
+8. Front Page Engine.
+9. Full dynamic Layout Engine.
+10. Production Visual Engine.
+11. Full Audio Edition generation.
+12. Audio Quality Control.
+13. Complete Audio + Text publication package.
+14. Hosted production deployment.
+15. Monitoring and alerting.
+16. Failure recovery.
+17. Controlled retry system.
+18. Complete end-to-end Quality Control.
+19. Full production rehearsal.
+20. Autonomous launch.
 
 ---
 
@@ -477,6 +576,7 @@ Timezone: America/New_York
 The scheduler must:
 
 - trigger the correct edition;
+- establish the correct Editorial Snapshot Time;
 - prevent accidental duplicate execution;
 - support retries;
 - survive process restarts;
@@ -517,7 +617,8 @@ QC must cover, where applicable:
 - source quality;
 - verification;
 - duplicate detection;
-- editorial decision validity.
+- editorial decision validity;
+- correct Editorial Snapshot eligibility.
 
 ### Content
 
@@ -562,6 +663,7 @@ Production monitoring must eventually provide visibility into:
 
 - edition start;
 - edition completion;
+- Editorial Snapshot Time;
 - article collection;
 - event count;
 - selected stories;
@@ -606,6 +708,8 @@ Real publication must use an explicit production path.
 - Source Registry;
 - Source Reputation;
 - Source Independence;
+- Editorial Snapshot eligibility;
+- `first_seen_at` / `last_updated_at` tracking;
 - improved editorial priority.
 
 ### Phase 3 — Edition Construction
@@ -637,6 +741,8 @@ Integrate:
 ```text
 Edition ID
 +
+Editorial Snapshot
++
 Text
 +
 Pages
@@ -655,7 +761,8 @@ Delivery Metadata
 Create a production-safe command capable of:
 
 - building one edition;
-- validating it;
+- collecting current source information;
+- validating the Editorial Snapshot;
 - generating the publication package;
 - delivering it;
 - recording persistent state.
@@ -692,6 +799,8 @@ Run a complete end-to-end production rehearsal:
 ```text
 Collection
 ↓
+Editorial Snapshot
+↓
 Verification
 ↓
 Editorial
@@ -716,7 +825,10 @@ The rehearsal must also verify:
 - restart safety;
 - duplicate scheduler safety;
 - timezone behavior;
-- all three daily schedules.
+- all three daily schedules;
+- information cutoff behavior;
+- late-arriving information behavior;
+- independent editorial selection for each edition.
 
 ### Phase 11 — Autonomous Launch
 
@@ -742,6 +854,8 @@ WORLD PULSE is considered production-complete only when:
 
 - the complete pipeline runs successfully;
 - news is collected and verified;
+- each edition is built from a fresh Editorial Snapshot;
+- information eligibility is evaluated against the edition snapshot;
 - editorial selection succeeds;
 - the edition is built;
 - visuals are valid;
