@@ -177,6 +177,39 @@ def is_snapshot_eligible(
     return snapshot_status(event, editorial_time) == SNAPSHOT_ELIGIBLE
 
 
+def filter_events_for_snapshot(
+    events: Any,
+    editorial_time: datetime,
+    *,
+    include_unknown: bool = False,
+) -> list[dict]:
+    """
+    Return events eligible for a specific editorial snapshot.
+
+    Unknown availability is excluded by default. Production ingestion
+    should provide first_seen_at whenever possible; include_unknown is
+    available for controlled compatibility paths and tests.
+    """
+
+    if not isinstance(events, list):
+        return []
+
+    results = []
+
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+
+        status = snapshot_status(event, editorial_time)
+
+        if status == SNAPSHOT_ELIGIBLE:
+            results.append(dict(event))
+        elif status == SNAPSHOT_UNKNOWN and include_unknown:
+            results.append(dict(event))
+
+    return results
+
+
 def annotate_snapshot(
     event: Any,
     editorial_time: datetime,
