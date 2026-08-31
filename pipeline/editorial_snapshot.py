@@ -151,9 +151,6 @@ def snapshot_status(
     availability.
     """
 
-    if not isinstance(editorial_time, datetime):
-        raise ValueError("editorial_time must be a datetime")
-
     snapshot = _parse_datetime(editorial_time)
     if snapshot is None:
         raise ValueError("editorial_time must be a valid datetime")

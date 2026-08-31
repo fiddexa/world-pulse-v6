@@ -182,7 +182,7 @@ def test_process_articles_excludes_information_after_snapshot():
     )
 
     titles = [
-        article["title"]
+        article.get("original_title", article.get("title"))
         for event in events
         for article in event.get("articles", [])
     ]
@@ -203,8 +203,8 @@ def test_build_edition_uses_publication_slot_as_snapshot_boundary():
         },
         {
             "title": "Known after seven",
-            "published_at": "2026-08-30T07:20:00Z",
-            "first_seen_at": "2026-08-30T07:20:00Z",
+            "published_at": "2026-08-30T11:20:00Z",
+            "first_seen_at": "2026-08-30T11:20:00Z",
             "source": "BBC",
         },
     ]
@@ -216,7 +216,7 @@ def test_build_edition_uses_publication_slot_as_snapshot_boundary():
     )
 
     titles = [
-        article["title"]
+        article.get("original_title", article.get("title"))
         for event in (
             [edition["top_story"]]
             + edition["main_stories"]

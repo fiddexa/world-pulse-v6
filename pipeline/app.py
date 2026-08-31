@@ -165,7 +165,23 @@ def process_articles(articles, *, editorial_time=None):
 
     analyzed = analyze_events(verified)
 
-    ranked = rank_events(analyzed)
+    ranking_time = editorial_time
+
+    if isinstance(ranking_time, str):
+        text = ranking_time.strip()
+
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+
+        try:
+            ranking_time = datetime.fromisoformat(text)
+        except ValueError:
+            ranking_time = None
+
+    ranked = rank_events(
+        analyzed,
+        now=ranking_time,
+    )
 
     editorial = decide_events(ranked)
 
@@ -184,6 +200,7 @@ def build_edition_from_articles(
     edition_time=None,
     *,
     event_memory=None,
+    editorial_time=None,
 ):
     """
     Process articles and build a WORLD PULSE edition.

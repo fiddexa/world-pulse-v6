@@ -21,9 +21,13 @@ It does not perform Telegram delivery.
 """
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from pipeline.app import build_edition_from_articles
-from pipeline.edition_id import build_edition_id
+from pipeline.edition_id import (
+    DEFAULT_TIMEZONE,
+    build_edition_id,
+)
 from pipeline.edition_memory import (
     COMPLETED,
     RUNNING,
@@ -99,12 +103,19 @@ def run_edition(
     if event_memory is None:
         event_memory = EventMemory()
 
+    editorial_time = datetime.fromisoformat(
+        f"{publication_date}T{edition_time}"
+    ).replace(
+        tzinfo=ZoneInfo(DEFAULT_TIMEZONE)
+    )
+
     if edition_memory is None:
         return build_edition_from_articles(
             articles,
             publication_date=publication_date,
             edition_time=edition_time,
             event_memory=event_memory,
+            editorial_time=editorial_time,
         )
 
     edition_id = build_edition_id(
@@ -138,6 +149,7 @@ def run_edition(
             publication_date=publication_date,
             edition_time=edition_time,
             event_memory=event_memory,
+            editorial_time=editorial_time,
         )
 
         if owns_execution:

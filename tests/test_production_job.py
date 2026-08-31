@@ -515,3 +515,49 @@ def test_production_job_can_run_with_registry_when_empty(
 
     edition_memory.close()
     event_memory.close()
+
+
+def test_editorial_snapshot_time_changes_ranking():
+    from datetime import datetime
+
+    from pipeline.ranking import rank_events
+
+    event = {
+        "articles": [
+            {
+                "title": "Major earthquake",
+                "published_at": "2026-08-30T05:00:00Z",
+            }
+        ],
+        "intelligence": {
+            "score": 70.0,
+        },
+        "verification": {
+            "verification_score": 50.0,
+        },
+    }
+
+    morning = rank_events(
+        [event],
+        now=datetime(2026, 8, 30, 7, 0),
+    )[0]
+
+    afternoon = rank_events(
+        [event],
+        now=datetime(2026, 8, 30, 13, 0),
+    )[0]
+
+    evening = rank_events(
+        [event],
+        now=datetime(2026, 8, 30, 20, 0),
+    )[0]
+
+    assert (
+        morning["ranking"]["freshness_score"]
+        > afternoon["ranking"]["freshness_score"]
+    )
+
+    assert (
+        afternoon["ranking"]["freshness_score"]
+        > evening["ranking"]["freshness_score"]
+    )

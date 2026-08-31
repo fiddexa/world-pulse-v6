@@ -16,10 +16,25 @@ It converts an edition-level structure into a complete
 Telegram publication package.
 """
 
+from datetime import datetime
 from typing import Any
 
 
 TELEGRAM = "telegram"
+
+
+SECTION_ORDER = (
+    "world",
+    "geopolitics",
+    "business",
+    "economy",
+    "markets",
+    "technology",
+    "science",
+    "health",
+    "culture",
+    "sports",
+)
 
 
 def _safe_text(value: Any) -> str:
@@ -51,36 +66,42 @@ def _content(event: Any) -> dict:
     return {}
 
 
+def _publication(event: Any) -> dict:
+    if not isinstance(event, dict):
+        return {}
+
+    value = event.get("publication")
+
+    if isinstance(value, dict):
+        return value
+
+    return {}
+
+
 def _telegram_text(event: Any) -> str:
     """
     Return the already-prepared event-level Telegram text.
 
-    Edition publication does not rewrite the event content.
+    Edition publication does not rewrite event content.
     """
-    if not isinstance(event, dict):
-        return ""
-
-    publication = event.get("publication")
-
-    if isinstance(publication, dict):
-        value = _safe_text(publication.get("telegram"))
-
-        if value:
-            return value
-
-    return ""
+    return _safe_text(
+        _publication(event).get("telegram")
+    )
 
 
 def _event_title(event: Any) -> str:
-    content = _content(event)
-
-    return _safe_text(content.get("headline"))
+    return _safe_text(
+        _content(event).get("headline")
+    )
 
 
 def _event_section(event: Any) -> str:
-    content = _content(event)
-
-    return _safe_text(content.get("section")) or "world"
+    return (
+        _safe_text(
+            _content(event).get("section")
+        ).lower()
+        or "world"
+    )
 
 
 def _event_role(event: Any) -> str:
@@ -90,7 +111,9 @@ def _event_role(event: Any) -> str:
     editorial = event.get("editorial")
 
     if isinstance(editorial, dict):
-        role = _safe_text(editorial.get("role"))
+        role = _safe_text(
+            editorial.get("role")
+        )
 
         if role:
             return role.upper()
@@ -100,7 +123,7 @@ def _event_role(event: Any) -> str:
 
 def _event_block(event: Any) -> dict:
     """
-    Build a deterministic event reference for the edition package.
+    Build deterministic event metadata for the edition package.
 
     The original event remains untouched.
     """
@@ -124,48 +147,164 @@ def _edition_events(edition: Any) -> list:
         events.append(top_story)
 
     for key in ("main_stories", "briefs"):
-        for event in _safe_list(edition.get(key)):
+        for event in _safe_list(
+            edition.get(key)
+        ):
             if isinstance(event, dict):
                 events.append(event)
 
     return events
 
 
+def _edition_datetime(edition: dict) -> str:
+    """
+    Resolve a human-readable edition date/time.
+
+    Uses edition_time/date when available.
+    """
+    edition_date = _safe_text(
+        edition.get("edition_date")
+    )
+
+    edition_time = _safe_text(
+        edition.get("edition_time")
+    )
+
+    if edition_date and edition_time:
+        return f"{edition_date} · {edition_time}"
+
+    if edition_date:
+        return edition_date
+
+    return ""
+
+
 def _build_header(edition: dict) -> str:
-    edition_id = _safe_text(edition.get("edition_id"))
+    edition_datetime = _edition_datetime(edition)
 
-    if edition_id:
-        return f"WORLD PULSE\nEdition {edition_id}"
+    parts = ["🌍 WORLD PULSE"]
 
-    return "WORLD PULSE"
+    if edition_datetime:
+        parts.append(edition_datetime)
+
+    return "\n".join(parts)
 
 
 def _build_section_header(section: str) -> str:
-    return section.replace("_", " ").upper()
+    return section.replace(
+        "_",
+        " ",
+    ).upper()
 
 
-def _build_telegram_text(edition: dict, events: list) -> str:
+def _build_story_block(event: dict) -> str:
+    telegram = _telegram_text(event)
+
+    if not telegram:
+        return ""
+
+    return telegram
+
+
+def _build_top_story(events: list) -> str:
+    for event in events:
+        if _event_role(event) == "TOP_STORY":
+            block = _build_story_block(event)
+
+            if block:
+                return (
+                    "TOP STORY\n"
+                    "━━━━━━━━━━━━\n\n"
+                    f"{block}"
+                )
+
+    return ""
+
+
+def _build_section_blocks(events: list) -> list:
     """
-    Build the complete Telegram edition text.
+    Group non-top-story events by section.
+
+    Known sections follow the canonical SECTION_ORDER.
+    Unknown sections are appended alphabetically.
+    """
+    grouped = {}
+
+    for event in events:
+        if _event_role(event) == "TOP_STORY":
+            continue
+
+        telegram = _telegram_text(event)
+
+        if not telegram:
+            continue
+
+        section = _event_section(event)
+
+        grouped.setdefault(
+            section,
+            [],
+        ).append(event)
+
+    if not grouped:
+        return []
+
+    ordered_sections = []
+
+    for section in SECTION_ORDER:
+        if section in grouped:
+            ordered_sections.append(section)
+
+    for section in sorted(grouped):
+        if section not in ordered_sections:
+            ordered_sections.append(section)
+
+    blocks = []
+
+    for section in ordered_sections:
+        stories = []
+
+        for event in grouped[section]:
+            block = _build_story_block(event)
+
+            if block:
+                stories.append(block)
+
+        if not stories:
+            continue
+
+        blocks.append(
+            _build_section_header(section)
+            + "\n"
+            + "━━━━━━━━━━━━\n\n"
+            + "\n\n".join(stories)
+        )
+
+    return blocks
+
+
+def _build_telegram_text(
+    edition: dict,
+    events: list,
+) -> str:
+    """
+    Build the complete editorial Telegram edition.
 
     Event-level publication text is reused exactly as prepared
     by the publication layer.
     """
-    parts = [_build_header(edition)]
+    parts = [
+        _build_header(edition)
+    ]
 
-    current_section = None
+    top_story = _build_top_story(events)
 
-    for event in events:
-        section = _event_section(event)
+    if top_story:
+        parts.append(top_story)
 
-        if section != current_section:
-            current_section = section
-            parts.append(_build_section_header(section))
-
-        telegram = _telegram_text(event)
-
-        if telegram:
-            parts.append(telegram)
+    parts.extend(
+        _build_section_blocks(events)
+    )
 
     return "\n\n".join(
         part
@@ -174,7 +313,9 @@ def _build_telegram_text(edition: dict, events: list) -> str:
     )
 
 
-def build_edition_publication(edition: Any) -> dict:
+def build_edition_publication(
+    edition: Any,
+) -> dict:
     """
     Build an edition-level publication package.
 
@@ -213,7 +354,9 @@ def build_edition_publication(edition: Any) -> dict:
     }
 
 
-def build_edition_publications(editions: Any) -> list:
+def build_edition_publications(
+    editions: Any,
+) -> list:
     """
     Build publication packages for multiple editions.
     """

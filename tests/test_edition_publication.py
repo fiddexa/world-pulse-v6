@@ -85,12 +85,17 @@ def test_telegram_contains_all_event_publications():
 
 
 def test_telegram_contains_edition_header():
-    result = build_edition_publication(edition())
+    item = edition()
+
+    item["edition_date"] = "2026-08-29"
+    item["edition_time"] = "23:00"
+
+    result = build_edition_publication(item)
 
     text = result["telegram"]["text"]
 
     assert "WORLD PULSE" in text
-    assert "Edition 20260829-2300-en" in text
+    assert "2026-08-29 · 23:00" in text
 
 
 def test_sections_are_grouped():
@@ -98,8 +103,9 @@ def test_sections_are_grouped():
 
     text = result["telegram"]["text"]
 
-    assert "GEOPOLITICS" in text
+    assert "TOP STORY" in text
     assert "BUSINESS" in text
+    assert "GEOPOLITICS" not in text
 
 
 def test_event_metadata_is_preserved_in_package():
@@ -169,3 +175,132 @@ def test_multiple_editions():
 def test_invalid_multiple_editions_input_is_safe():
     assert build_edition_publications(None) == []
     assert build_edition_publications("invalid") == []
+
+
+def test_header_uses_edition_date_and_time():
+    item = edition()
+
+    item["edition_date"] = "2026-08-30"
+    item["edition_time"] = "13:00"
+
+    result = build_edition_publication(item)
+
+    text = result["telegram"]["text"]
+
+    assert "🌍 WORLD PULSE" in text
+    assert "2026-08-30 · 13:00" in text
+
+
+def test_top_story_has_dedicated_block():
+    result = build_edition_publication(edition())
+
+    text = result["telegram"]["text"]
+
+    assert "TOP STORY" in text
+    assert "━━━━━━━━━━━━" in text
+    assert text.index("TOP STORY") < text.index(
+        "TOP STORY TEXT"
+    )
+
+
+def test_top_story_is_not_repeated_inside_section():
+    result = build_edition_publication(edition())
+
+    text = result["telegram"]["text"]
+
+    assert text.count("TOP STORY TEXT") == 1
+
+
+def test_multiple_sections_are_rendered():
+    item = edition()
+
+    item["main_stories"].append(
+        event(
+            "Technology story",
+            "TECHNOLOGY STORY TEXT",
+            section="technology",
+            role="MAIN_STORY",
+        )
+    )
+
+    result = build_edition_publication(item)
+
+    text = result["telegram"]["text"]
+
+    assert "BUSINESS" in text
+    assert "TECHNOLOGY" in text
+    assert "MAIN STORY TEXT" in text
+    assert "TECHNOLOGY STORY TEXT" in text
+
+
+def test_empty_sections_are_not_rendered():
+    item = edition()
+
+    item["main_stories"] = []
+    item["briefs"] = []
+
+    result = build_edition_publication(item)
+
+    text = result["telegram"]["text"]
+
+    assert "BUSINESS" not in text
+    assert "GEOPOLITICS" not in text
+
+
+def test_sections_follow_canonical_order():
+    item = edition()
+
+    item["main_stories"].append(
+        event(
+            "Technology",
+            "TECH STORY",
+            section="technology",
+            role="MAIN_STORY",
+        )
+    )
+
+    item["main_stories"].append(
+        event(
+            "World",
+            "WORLD STORY",
+            section="world",
+            role="MAIN_STORY",
+        )
+    )
+
+    result = build_edition_publication(item)
+
+    text = result["telegram"]["text"]
+
+    assert text.index("WORLD") < text.index(
+        "TECHNOLOGY"
+    )
+
+
+def test_unknown_sections_are_supported():
+    item = edition()
+
+    item["main_stories"].append(
+        event(
+            "Culture story",
+            "CULTURE STORY",
+            section="culture",
+            role="MAIN_STORY",
+        )
+    )
+
+    result = build_edition_publication(item)
+
+    assert "CULTURE" in result["telegram"]["text"]
+
+
+def test_event_publication_text_is_not_rewritten():
+    item = edition()
+
+    original = (
+        item["top_story"]["publication"]["telegram"]
+    )
+
+    result = build_edition_publication(item)
+
+    assert original in result["telegram"]["text"]
