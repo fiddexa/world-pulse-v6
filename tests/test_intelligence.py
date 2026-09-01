@@ -158,3 +158,206 @@ def test_analyze_events_preserves_events():
     assert "articles" in results[0]
     assert "intelligence" in results[0]
     assert "intelligence" in results[1]
+
+
+def test_large_population_scale_increases_impact():
+    small = _event(
+        event_types=["humanitarian"],
+        locations=["afghanistan"],
+    )
+
+    large = _event(
+        event_types=["humanitarian"],
+        locations=["afghanistan"],
+    )
+
+    large["articles"][0]["scale_numbers"] = [
+        {
+            "value": 1,
+            "multiplier": 1_000_000,
+            "raw": "one million",
+            "context": "children",
+        }
+    ]
+
+    assert intelligence_score(large) > intelligence_score(small)
+
+
+def test_scale_numbers_do_not_count_as_casualties():
+    event = _event(
+        event_types=["humanitarian"],
+        locations=["afghanistan"],
+    )
+
+    event["articles"][0]["scale_numbers"] = [
+        {
+            "value": 3.7,
+            "multiplier": 1_000_000,
+            "raw": "3.7 million",
+            "context": "children",
+        }
+    ]
+
+    result = analyze_event(event)
+
+    assert result["maximum_scale_number"] == 3_700_000.0
+    assert result["maximum_casualty_number"] == 0.0
+
+
+def test_million_scale_gets_strong_scale_score():
+    event = _event(
+        event_types=["humanitarian"],
+        locations=["afghanistan"],
+    )
+
+    event["articles"][0]["scale_numbers"] = [
+        {
+            "value": 1,
+            "multiplier": 1_000_000,
+            "raw": "one million",
+            "context": "children",
+        }
+    ]
+
+    result = analyze_event(event)
+
+    assert result["scale_score"] == 25.0
+
+
+def test_large_humanitarian_scale_reaches_high_impact():
+    event = _event(
+        event_types=["health", "humanitarian"],
+        locations=["afghanistan"],
+    )
+
+    event["articles"][0]["scale_numbers"] = [
+        {
+            "value": 3.7,
+            "multiplier": 1_000_000,
+            "raw": "3.7 million",
+            "context": "children",
+        }
+    ]
+
+    result = analyze_event(event)
+
+    assert result["maximum_scale_number"] == 3_700_000.0
+    assert result["scale_score"] >= 25.0
+    assert result["score"] >= 50.0
+
+
+def test_population_scale_is_not_casualty_impact():
+    event = _event(
+        event_types=["humanitarian"],
+        locations=["afghanistan"],
+    )
+
+    event["articles"][0]["scale_numbers"] = [
+        {
+            "value": 3.7,
+            "multiplier": 1_000_000,
+            "raw": "3.7 million",
+            "context": "children",
+        }
+    ]
+
+    result = analyze_event(event)
+
+    assert result["maximum_scale_number"] == 3_700_000.0
+    assert result["maximum_casualty_number"] == 0.0
+
+
+def test_mass_displacement_has_scale_impact():
+    event = _event(
+        event_types=["humanitarian"],
+        locations=["nepal"],
+    )
+
+    event["articles"][0]["scale_numbers"] = [
+        {
+            "value": 500,
+            "multiplier": 1_000,
+            "raw": "500,000",
+            "context": "people",
+        }
+    ]
+
+    result = analyze_event(event)
+
+    assert result["maximum_scale_number"] == 500_000.0
+    assert result["scale_score"] >= 20.0
+
+
+def test_malnutrition_scale_gets_humanitarian_bonus():
+    event = _event(
+        event_types=["health", "humanitarian"],
+        locations=["afghanistan"],
+    )
+
+    event["articles"][0]["scale_numbers"] = [
+        {
+            "value": 3.7,
+            "multiplier": 1_000_000,
+            "raw": "3.7 million",
+            "context": "children",
+        }
+    ]
+
+    result = analyze_event(event)
+
+    assert result["scale_score"] >= 25.0
+
+
+def test_displaced_population_is_recognized_as_mass_impact():
+    event = _event(
+        event_types=["humanitarian"],
+        locations=["nepal"],
+    )
+
+    event["articles"][0]["scale_numbers"] = [
+        {
+            "value": 500,
+            "multiplier": 1_000,
+            "raw": "500,000",
+            "context": "people",
+        }
+    ]
+
+    result = analyze_event(event)
+
+    assert result["scale_score"] >= 20.0
+
+
+def test_large_livelihood_scale_does_not_equal_direct_humanitarian_harm():
+    humanitarian = _event(
+        event_types=["health", "humanitarian"],
+        locations=["afghanistan"],
+    )
+
+    humanitarian["articles"][0]["scale_numbers"] = [
+        {
+            "value": 3.7,
+            "multiplier": 1_000_000,
+            "raw": "3.7 million",
+            "context": "children",
+        }
+    ]
+
+    economic = _event(
+        event_types=["humanitarian"],
+        locations=["afghanistan"],
+    )
+
+    economic["articles"][0]["scale_numbers"] = [
+        {
+            "value": 3,
+            "multiplier": 1_000_000_000,
+            "raw": "3 billion",
+            "context": "livelihoods",
+        }
+    ]
+
+    humanitarian_result = analyze_event(humanitarian)
+    economic_result = analyze_event(economic)
+
+    assert humanitarian_result["scale_score"] >= economic_result["scale_score"]

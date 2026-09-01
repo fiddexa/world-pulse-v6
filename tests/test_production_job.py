@@ -261,47 +261,22 @@ def test_production_job_rejects_articles_and_feeds_together():
     event_memory.close()
 
 
-def test_production_job_uses_configured_feeds_when_not_supplied(
+def test_production_job_uses_source_connectors_when_feeds_not_supplied(
     monkeypatch,
 ):
     edition_memory = EditionMemory(":memory:")
     event_memory = EventMemory(":memory:")
 
-    configured_feeds = [
-        {
-            "url": "https://example.com/feed.xml",
-            "source": "Test Source",
-            "type": "rss",
-            "requires_auth": False,
-        }
-    ]
+    collected_articles = articles()
+    calls = []
 
-    collected = []
-
-    def fake_get_feeds():
-        return configured_feeds
-
-    def fake_collect(
-        feeds,
-        timeout=15,
-    ):
-        collected.append(
-            (
-                feeds,
-                timeout,
-            )
-        )
-
-        return articles()
+    def fake_collect_production_articles(timeout=15):
+        calls.append(timeout)
+        return collected_articles
 
     monkeypatch.setattr(
-        "pipeline.production_job.get_feeds",
-        fake_get_feeds,
-    )
-
-    monkeypatch.setattr(
-        "pipeline.production_job.collect",
-        fake_collect,
+        "pipeline.production_job.collect_production_articles",
+        fake_collect_production_articles,
     )
 
     result = run_production_job(
@@ -318,13 +293,10 @@ def test_production_job_uses_configured_feeds_when_not_supplied(
     )
 
     assert result["status"] == COMPLETED_RESULT
-
-    assert collected == [
-        (
-            configured_feeds,
-            12,
-        )
-    ]
+    assert result["edition_id"] == (
+        "WORLD-PULSE-EN-2026-08-30-1300"
+    )
+    assert calls == [12]
 
     edition_memory.close()
     event_memory.close()
@@ -470,29 +442,21 @@ def test_explicit_feeds_override_configured_feeds(
     event_memory.close()
 
 
-def test_production_job_can_run_with_registry_when_empty(
+def test_production_job_can_run_with_empty_connector_result(
     monkeypatch,
 ):
     edition_memory = EditionMemory(":memory:")
     event_memory = EventMemory(":memory:")
 
-    monkeypatch.setattr(
-        "pipeline.production_job.get_feeds",
-        lambda: [],
-    )
-
     calls = []
 
-    def fake_collect(
-        feeds,
-        timeout=15,
-    ):
-        calls.append(feeds)
+    def fake_collect_production_articles(timeout=15):
+        calls.append(timeout)
         return []
 
     monkeypatch.setattr(
-        "pipeline.production_job.collect",
-        fake_collect,
+        "pipeline.production_job.collect_production_articles",
+        fake_collect_production_articles,
     )
 
     result = run_production_job(
@@ -507,7 +471,7 @@ def test_production_job_can_run_with_registry_when_empty(
         event_memory=event_memory,
     )
 
-    assert calls == [[]]
+    assert calls == [15]
 
     assert result["edition_id"] == (
         "WORLD-PULSE-EN-2026-08-30-1300"
@@ -561,3 +525,41 @@ def test_editorial_snapshot_time_changes_ranking():
         afternoon["ranking"]["freshness_score"]
         > evening["ranking"]["freshness_score"]
     )
+
+
+def test_production_job_uses_source_connector_layer(
+    monkeypatch,
+):
+    edition_memory = EditionMemory(":memory:")
+    event_memory = EventMemory(":memory:")
+
+    collected_articles = articles()
+    calls = []
+
+    def fake_collect_production_articles(timeout=15):
+        calls.append(timeout)
+        return collected_articles
+
+    monkeypatch.setattr(
+        "pipeline.production_job.collect_production_articles",
+        fake_collect_production_articles,
+    )
+
+    result = run_production_job(
+        current_time=datetime(
+            2026,
+            8,
+            30,
+            13,
+            45,
+        ),
+        timeout=21,
+        edition_memory=edition_memory,
+        event_memory=event_memory,
+    )
+
+    assert result["status"] == COMPLETED_RESULT
+    assert calls == [21]
+
+    edition_memory.close()
+    event_memory.close()

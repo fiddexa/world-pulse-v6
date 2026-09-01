@@ -125,7 +125,11 @@ def process_articles(articles, *, editorial_time=None):
         result["original_title"] = original_title
         result["original_summary"] = original_summary
 
-        facts = extract_facts(result)
+        facts = extract_facts({
+            **result,
+            "title": article.get("title", ""),
+            "summary": article.get("summary", ""),
+        })
 
         enriched = dict(result)
 
@@ -151,6 +155,11 @@ def process_articles(articles, *, editorial_time=None):
         )
         enriched["casualty_numbers"] = facts.get(
             "casualty_numbers",
+            [],
+        )
+
+        enriched["scale_numbers"] = facts.get(
+            "scale_numbers",
             [],
         )
 

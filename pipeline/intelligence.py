@@ -130,6 +130,183 @@ def _max_casualty_number(event):
     return maximum
 
 
+
+def _scale_numbers(event):
+    """
+    Return extracted population/impact scale records from an event.
+
+    Scale numbers represent the size of an affected population or
+    humanitarian impact. They are deliberately kept separate from
+    casualty numbers.
+    """
+
+    if not isinstance(event, dict):
+        return []
+
+    results = []
+
+    direct = event.get("scale_numbers")
+
+    if isinstance(direct, list):
+        results.extend(
+            item
+            for item in direct
+            if isinstance(item, dict)
+        )
+
+    for article in _articles(event):
+        values = article.get("scale_numbers")
+
+        if isinstance(values, list):
+            results.extend(
+                item
+                for item in values
+                if isinstance(item, dict)
+            )
+
+    return results
+
+
+def _maximum_scale_number(event):
+    """
+    Return the largest normalized human-impact scale.
+
+    A record such as:
+        value=3.7, multiplier=1_000_000
+
+    represents:
+        3,700,000
+
+    This does not imply casualties.
+    """
+
+    maximum = 0.0
+
+    for item in _scale_numbers(event):
+        value = _safe_number(item.get("value"))
+
+        if value is None:
+            continue
+
+        multiplier = _safe_number(
+            item.get("multiplier")
+        )
+
+        if multiplier <= 0:
+            continue
+
+        maximum = max(
+            maximum,
+            value * multiplier,
+        )
+
+    return maximum
+
+
+def _scale_score(event):
+    """
+    Convert population/impact scale into an objective impact score.
+
+    The score considers both:
+    - the size of the affected population
+    - the context of that population
+
+    Direct human-impact contexts receive stronger weighting
+    than indirect contexts such as livelihoods.
+
+    This measures affected-population scale, not deaths.
+    """
+
+    number = _maximum_scale_number(event)
+
+    if number < 1_000:
+        base_score = 0.0
+    elif number < 10_000:
+        base_score = 5.0
+    elif number < 100_000:
+        base_score = 10.0
+    elif number < 500_000:
+        base_score = 15.0
+    elif number < 1_000_000:
+        base_score = 20.0
+    elif number < 5_000_000:
+        base_score = 25.0
+    else:
+        base_score = 30.0
+
+    if base_score <= 0.0:
+        return 0.0
+
+    direct_human_contexts = {
+        "children",
+        "child",
+        "people",
+        "person",
+        "patients",
+        "victims",
+        "refugees",
+        "displaced",
+        "residents",
+        "families",
+    }
+
+    humanitarian_contexts = {
+        "cases",
+        "homes",
+        "households",
+        "workers",
+    }
+
+    indirect_contexts = {
+        "livelihoods",
+    }
+
+    direct = False
+    humanitarian = False
+    indirect = False
+
+    for item in _scale_numbers(event):
+        context = str(
+            item.get("context", "")
+        ).strip().lower()
+
+        value = _safe_number(
+            item.get("value")
+        )
+
+        multiplier = _safe_number(
+            item.get("multiplier")
+        )
+
+        if value is None or multiplier is None:
+            continue
+
+        if multiplier <= 0:
+            continue
+
+        normalized = value * multiplier
+
+        if normalized < 1_000:
+            continue
+
+        if context in direct_human_contexts:
+            direct = True
+        elif context in humanitarian_contexts:
+            humanitarian = True
+        elif context in indirect_contexts:
+            indirect = True
+
+    if direct:
+        return max(base_score, 25.0)
+
+    if humanitarian:
+        return max(base_score, 20.0)
+
+    if indirect:
+        return min(base_score, 25.0)
+
+    return base_score
+
 def _casualty_score(event):
     number = _max_casualty_number(event)
 
@@ -250,6 +427,7 @@ def intelligence_score(event):
     score = (
         _type_score(event)
         + _casualty_score(event)
+        + _scale_score(event)
         + _geographic_score(event)
         + _scope_score(event)
     )
@@ -290,6 +468,8 @@ def analyze_event(event):
         "event_types": sorted(_event_types(event)),
         "locations": sorted(_locations(event)),
         "maximum_casualty_number": _max_casualty_number(event),
+        "maximum_scale_number": _maximum_scale_number(event),
+        "scale_score": _scale_score(event),
         "article_count": len(_articles(event)),
     }
 

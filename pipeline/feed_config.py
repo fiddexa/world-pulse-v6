@@ -50,6 +50,82 @@ FEED_REGISTRY = {
     "opec": [],
 }
 
+CONNECTOR_REGISTRY = {
+    "reuters": {
+        "type": "licensed",
+        "enabled": False,
+    },
+    "associated_press": {
+        "type": "api",
+        "enabled": False,
+    },
+    "bbc": {
+        "type": "licensed",
+        "enabled": False,
+    },
+    "afp": {
+        "type": "licensed",
+        "enabled": False,
+    },
+    "un": {
+        "type": "rss",
+        "enabled": True,
+    },
+    "imf": {
+        "type": "rss",
+        "enabled": False,
+    },
+    "world_bank": {
+        "type": "api",
+        "enabled": False,
+    },
+    "who": {
+        "type": "rss",
+        "enabled": False,
+    },
+    "iea": {
+        "type": "rss",
+        "enabled": False,
+    },
+    "opec": {
+        "type": "rss",
+        "enabled": False,
+    },
+}
+
+
+def get_connector_config(source=None):
+    """
+    Return connector configuration.
+
+    Returned records are defensive copies.
+    """
+
+    if source is not None:
+        key = str(source).strip().lower()
+        return deepcopy(
+            CONNECTOR_REGISTRY.get(
+                key,
+                {},
+            )
+        )
+
+    return deepcopy(CONNECTOR_REGISTRY)
+
+
+def configured_connectors():
+    """
+    Return source identifiers with enabled connectors.
+    """
+
+    return [
+        source
+        for source, config in CONNECTOR_REGISTRY.items()
+        if isinstance(config, dict)
+        and config.get("enabled") is True
+    ]
+
+
 
 def all_sources():
     """

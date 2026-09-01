@@ -38,7 +38,52 @@ from pipeline.collector import collect
 from pipeline.edition_memory import EditionMemory
 from pipeline.event_memory import EventMemory
 from pipeline.feed_config import get_feeds
+from pipeline.connector_config import get_connector_registry
+from pipeline.source_connectors import (
+    build_connectors,
+    collect_from_connectors,
+)
 from pipeline.production_scheduler import run_scheduled_edition
+
+
+
+def collect_production_articles(*, timeout=15):
+    """
+    Collect production news through the configured Source Connector Layer.
+
+    Only explicitly enabled connectors participate.
+
+    Connector failures are isolated by collect_from_connectors().
+    """
+    connector_registry = get_connector_registry()
+
+    configured_feeds = get_feeds()
+
+    feed_registry = {
+        source: []
+        for source in connector_registry
+    }
+
+    if isinstance(configured_feeds, (list, tuple)):
+        for feed in configured_feeds:
+            if not isinstance(feed, dict):
+                continue
+
+            source = str(
+                feed.get("source") or ""
+            ).strip().lower()
+
+            if source in feed_registry:
+                feed_registry[source].append(feed)
+
+    connectors = build_connectors(
+        feed_registry=feed_registry,
+        connector_registry=connector_registry,
+        collector=collect,
+        timeout=timeout,
+    )
+
+    return collect_from_connectors(connectors)
 
 
 def run_production_job(
@@ -108,12 +153,14 @@ def run_production_job(
 
     if articles is None:
         if feeds is None:
-            feeds = get_feeds()
-
-        articles = collect(
-            feeds,
-            timeout=timeout,
-        )
+            articles = collect_production_articles(
+                timeout=timeout,
+            )
+        else:
+            articles = collect(
+                feeds,
+                timeout=timeout,
+            )
 
     if edition_memory is None:
         edition_memory = EditionMemory()
