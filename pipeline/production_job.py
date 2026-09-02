@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Production Job
+AROUND THE MAIN v6 - Production Job
 
 Single production entrypoint for one autonomous edition execution.
 

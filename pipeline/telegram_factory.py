@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Telegram Publisher Factory
+AROUND THE MAIN v6 - Telegram Publisher Factory
 
 Creates a production-ready TelegramPublisher from environment
 configuration.

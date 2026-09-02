@@ -1,7 +1,7 @@
 """
-WORLD PULSE v6 - Edition Slots
+AROUND THE MAIN v6 - Edition Slots
 
-Defines the fixed daily WORLD PULSE publication slots.
+Defines the fixed daily AROUND THE MAIN publication slots.
 
 This module does not schedule or execute editions.
 It only provides the canonical production slot configuration.

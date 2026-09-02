@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Edition Builder
+AROUND THE MAIN v6 - Edition Builder
 
 Builds a deterministic editorial edition from processed events.
 
@@ -29,7 +29,9 @@ SECTION_ORDER = (
 
 
 ROLE_ORDER = (
+    "LEAD_STORY",
     "TOP_STORY",
+    "SECTION_STORY",
     "MAIN_STORY",
     "BRIEF",
 )
@@ -74,10 +76,22 @@ def _role(event: dict) -> str:
     role = editorial.get("role")
 
     if role:
-        return str(role).strip().upper()
+        value = str(role).strip().upper()
+
+        aliases = {
+            "FRONT_PAGE": "LEAD_STORY",
+            "LEAD_STORY": "LEAD_STORY",
+            "TOP_STORY": "TOP_STORY",
+            "IMPORTANT": "SECTION_STORY",
+            "SECTION_STORY": "SECTION_STORY",
+            "MAIN_STORY": "MAIN_STORY",
+            "STANDARD": "BRIEF",
+            "BRIEF": "BRIEF",
+        }
+
+        return aliases.get(value, value)
 
     return "BRIEF"
-
 
 def _section(event: dict) -> str:
     """
@@ -162,6 +176,8 @@ def build_edition(
     events: Any,
     publication_date=None,
     edition_time=None,
+    *,
+    exclude_ignored: bool = False,
 ) -> dict:
     """
     Build one deterministic edition structure.
@@ -177,6 +193,15 @@ def build_edition(
         for event in events
         if isinstance(event, dict)
         and _is_publishable(event)
+        and not (
+            exclude_ignored
+            and str(
+                _editorial(event).get(
+                    "decision",
+                    "",
+                )
+            ).strip().upper() == "IGNORE"
+        )
     ]
 
     ordered = sorted(
@@ -191,9 +216,14 @@ def build_edition(
     for event in ordered:
         role = _role(event)
 
-        if role == "TOP_STORY" and top_story is None:
+        if role == "LEAD_STORY" and top_story is None:
             top_story = event
-        elif role == "MAIN_STORY":
+        elif role == "TOP_STORY" and top_story is None:
+            top_story = event
+        elif role in {
+            "SECTION_STORY",
+            "MAIN_STORY",
+        }:
             main_stories.append(event)
         else:
             briefs.append(event)

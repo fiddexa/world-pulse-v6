@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Content Builder
+AROUND THE MAIN v6 - Content Builder
 
 Builds publication-ready structured content from editorial events.
 
@@ -68,6 +68,47 @@ def _summary(event):
             return summary
 
     return _first_nonempty(event.get("summary"))
+
+
+def _why_it_matters(event):
+    """
+    Return an explicitly supplied editorial context.
+
+    This field must not be inferred from an impact score or
+    generated as an unsupported opinion. If no factual/editorial
+    context is supplied by an upstream layer, return an empty
+    string and leave the item for editorial review.
+    """
+
+    if not isinstance(event, dict):
+        return ""
+
+    content = event.get("content")
+
+    if isinstance(content, dict):
+        value = _first_nonempty(
+            content.get("why_it_matters")
+        )
+
+        if value:
+            return value
+
+    value = _first_nonempty(
+        event.get("why_it_matters")
+    )
+
+    if value:
+        return value
+
+    for article in _articles(event):
+        value = _first_nonempty(
+            article.get("why_it_matters")
+        )
+
+        if value:
+            return value
+
+    return ""
 
 
 def _section(event):
@@ -187,6 +228,7 @@ def build_content(event):
     result["content"] = {
         "headline": _headline(event),
         "summary": _summary(event),
+        "why_it_matters": _why_it_matters(event),
         "section": _section(event),
         "verification": _verification_status(event),
         "sources": _sources(event),

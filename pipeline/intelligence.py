@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Intelligence Layer
+AROUND THE MAIN v6 - Intelligence Layer
 
 Measures objective event impact.
 

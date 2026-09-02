@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Editorial Ranking Layer
+AROUND THE MAIN v6 - Editorial Ranking Layer
 
 Ranks clustered events for editorial placement.
 

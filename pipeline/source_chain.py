@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Source Chain
+AROUND THE MAIN v6 - Source Chain
 
 Measures source provenance and independence.
 

@@ -458,6 +458,53 @@ def extract_casualty_numbers(text):
         results.add(match.group(1))
 
     # -----------------------------------------------------
+    # DEATH TOLL / CASUALTY TOLL
+    # -----------------------------------------------------
+    # Handle constructions where the casualty noun comes
+    # before the number:
+    #
+    #   death toll ... 903
+    #   death toll has surged to 903
+    #   confirmed death toll ... 903
+    #   death toll reached 903
+    #
+    # Keep the window deliberately short so unrelated numbers
+    # later in a sentence are not incorrectly classified.
+
+    death_toll_pattern = (
+        r"\b(?:"
+        r"death\s+toll"
+        r"|casualty\s+toll"
+        r"|confirmed\s+death\s+toll"
+        r")\b"
+        r"(?:\s+\w+){0,6}\s+"
+        r"(?:"
+        r"to\s+"
+        r"|of\s+"
+        r"|reached\s+"
+        r"|hit\s+"
+        r"|surged\s+to\s+"
+        r"|rose\s+to\s+"
+        r"|climbed\s+to\s+"
+        r"|stands\s+at\s+"
+        r"|is\s+now\s+"
+        r"|has\s+reached\s+"
+        r"|has\s+surged\s+to\s+"
+        r"|has\s+risen\s+to\s+"
+        r"|"
+        r")?"
+        r"(\d+(?:[.,]\d+)?)\b"
+    )
+
+    for match in re.finditer(
+        death_toll_pattern,
+        normalized,
+    ):
+        results.add(
+            match.group(1)
+        )
+
+    # -----------------------------------------------------
     # SIMPLE NUMBER WORDS
     # -----------------------------------------------------
 

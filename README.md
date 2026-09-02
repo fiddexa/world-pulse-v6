@@ -1,11 +1,11 @@
-# WORLD PULSE v6
+# AROUND THE MAIN v6
 
-**MINIMUM TEXT. MAXIMUM MEANING.**  
-**FACTS FIRST. CONTEXT SECOND.**
+**MINIMUM TEXT. MAXIMUM CLARITY.**  
+**VERIFIED FACTS. CLEAR SOURCES. NO AUTOMATED OPINION.**
 
-WORLD PULSE is an automated international news publication system designed to transform verified global information into concise, neutral and contextualized newspaper-style editions.
+AROUND THE MAIN is an automated international news publication system designed to transform verified global information into concise, neutral and clearly sourced newspaper-style editions.
 
-WORLD PULSE is **not a headline aggregator**. International sources provide the information used by the system; the final product is an independently formed WORLD PULSE editorial view of the world at a specific publication moment.
+AROUND THE MAIN is **not a headline aggregator**. International sources provide the information used by the system; the final product is a structured news edition built from verified information, source attribution and editorial selection.
 
 ---
 
@@ -17,7 +17,7 @@ WORLD PULSE is **not a headline aggregator**. International sources provide the 
 | Audience timezone | `America/New_York` |
 | Daily editions | 3 |
 | Edition times | 07:00 / 13:00 / 20:00 |
-| Telegram channel | `@WorldPulseDaily` |
+| Telegram channel | `@aroundthemain` |
 | Telegram format | Audio Edition → Text Edition |
 | Operation model | Fully autonomous after production launch |
 
@@ -28,12 +28,12 @@ WORLD PULSE is **not a headline aggregator**. International sources provide the 
 The three daily editions are **three independent editorial decisions**, not three automatic re-publications of the same news feed.
 
 ```text
-07:00 → NEW INFORMATION SNAPSHOT → WORLD PULSE 07:00
-13:00 → NEW INFORMATION SNAPSHOT → WORLD PULSE 13:00
-20:00 → NEW INFORMATION SNAPSHOT → WORLD PULSE 20:00
+07:00 → NEW INFORMATION SNAPSHOT → AROUND THE MAIN 07:00
+13:00 → NEW INFORMATION SNAPSHOT → AROUND THE MAIN 13:00
+20:00 → NEW INFORMATION SNAPSHOT → AROUND THE MAIN 20:00
 ```
 
-Before each edition, WORLD PULSE must collect and process the information available from its configured international sources and determine what is most important for the world audience at that moment.
+Before each edition, AROUND THE MAIN must collect and process the information available from its configured international sources and determine what is most important for the world audience at that moment.
 
 The central editorial question is:
 
@@ -41,7 +41,7 @@ The central editorial question is:
 
 ### The system does not use a rigid "last N hours" rule
 
-Publication time from a source is only one signal. WORLD PULSE must not automatically use rules such as:
+Publication time from a source is only one signal. AROUND THE MAIN must not automatically use rules such as:
 
 - include everything published within 6 hours;
 - exclude everything older than 24 hours;
@@ -55,7 +55,7 @@ Where possible, the system should distinguish:
 
 - `event_time` — when the event happened;
 - `published_at` — when a source published a report;
-- `first_seen_at` — when WORLD PULSE first received the information;
+- `first_seen_at` — when AROUND THE MAIN first received the information;
 - `last_updated_at` — when significant new information became available;
 - `editorial_time` — the time used for the edition's editorial snapshot.
 
@@ -63,7 +63,7 @@ These timestamps must not be treated as interchangeable.
 
 ### Late information example
 
-If an earthquake occurs at 05:30 but the first relevant source report becomes available to WORLD PULSE at 07:20:
+If an earthquake occurs at 05:30 but the first relevant source report becomes available to AROUND THE MAIN at 07:20:
 
 ```text
 07:00 snapshot → information not yet available → cannot be selected
@@ -90,7 +90,7 @@ Event Memory provides historical context and duplicate awareness; it must not be
 
 ### Own editorial product
 
-WORLD PULSE uses source material as input and independently forms:
+AROUND THE MAIN uses source material as input and independently forms:
 
 - the headline;
 - the summary;
@@ -117,9 +117,9 @@ EDITORIAL SNAPSHOT
             ↓
 RANKING / EDITORIAL SELECTION
             ↓
-WORLD PULSE HEADLINE + SUMMARY
+AROUND THE MAIN HEADLINE + SUMMARY
             ↓
-WORLD PULSE EDITION
+AROUND THE MAIN EDITION
 ```
 
 **Each edition = new information collection + new analysis + new editorial decision.**
@@ -168,7 +168,7 @@ Telegram
 
 ## Editorial Directions
 
-WORLD PULSE uses 14 established editorial directions:
+AROUND THE MAIN uses 14 established editorial directions:
 
 1. World
 2. Politics
@@ -193,11 +193,11 @@ The system must never artificially fill an edition.
 
 ## Editorial Principles
 
-WORLD PULSE follows two primary principles:
+AROUND THE MAIN follows two primary principles:
 
 > **MINIMUM TEXT. MAXIMUM MEANING.**
 
-> **FACTS FIRST. CONTEXT SECOND.**
+> **VERIFIED FACTS. CLEAR SOURCES. NO AUTOMATED OPINION.**
 
 The publication is designed to be:
 
@@ -261,7 +261,7 @@ The Front Page is not a mechanical list of every story.
 
 ## Newspaper Edition
 
-WORLD PULSE is designed as a digital newspaper-style publication.
+AROUND THE MAIN is designed as a digital newspaper-style publication.
 
 An edition may contain:
 
@@ -315,7 +315,7 @@ It should represent the complete published edition in coherent spoken form while
 
 Current production channel:
 
-`@WorldPulseDaily`
+`@aroundthemain`
 
 The Telegram production path has been implemented and tested.
 
@@ -367,7 +367,7 @@ Secrets must never be:
 
 ## Autonomous Publication
 
-After production launch, WORLD PULSE must operate without:
+After production launch, AROUND THE MAIN must operate without:
 
 - an open browser;
 - an active ChatGPT session;
@@ -408,7 +408,7 @@ The Edition ID must identify, at minimum:
 Conceptual example:
 
 ```text
-WORLD-PULSE-EN-2026-08-30-0700
+AROUND-THE-MAIN-EN-2026-08-30-0700
 ```
 
 The final technical implementation may define the exact format.
@@ -419,7 +419,7 @@ Audio, text, visuals and delivery records belonging to the same edition must use
 
 ## Persistent Event Memory
 
-WORLD PULSE requires persistent event memory.
+AROUND THE MAIN requires persistent event memory.
 
 The target operational memory is approximately 30 days for recent events.
 
@@ -850,7 +850,7 @@ Important production decisions must be reflected in the master specification rat
 
 ## Production Completion
 
-WORLD PULSE is considered production-complete only when:
+AROUND THE MAIN is considered production-complete only when:
 
 - the complete pipeline runs successfully;
 - news is collected and verified;
@@ -894,4 +894,4 @@ Future approved architectural or product decisions must be reflected in the mast
 
 > **MINIMUM TEXT. MAXIMUM MEANING.**
 
-> **FACTS FIRST. CONTEXT SECOND.**
+> **VERIFIED FACTS. CLEAR SOURCES. NO AUTOMATED OPINION.**

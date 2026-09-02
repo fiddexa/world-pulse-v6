@@ -119,13 +119,13 @@ def test_edition_id_is_stored(tmp_path):
 
     memory.remember(
         event(),
-        edition_id="WORLD-PULSE-EN-2026-08-30-0700",
+        edition_id="AROUND-THE-MAIN-EN-2026-08-30-0700",
     )
 
     stored = memory.get(event())
 
     assert stored["last_edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-0700"
+        "AROUND-THE-MAIN-EN-2026-08-30-0700"
     )
 
     memory.close()
@@ -138,18 +138,18 @@ def test_new_edition_id_replaces_previous_edition_id(tmp_path):
 
     memory.remember(
         event(),
-        edition_id="WORLD-PULSE-EN-2026-08-30-0700",
+        edition_id="AROUND-THE-MAIN-EN-2026-08-30-0700",
     )
 
     memory.remember(
         event(),
-        edition_id="WORLD-PULSE-EN-2026-08-30-1300",
+        edition_id="AROUND-THE-MAIN-EN-2026-08-30-1300",
     )
 
     stored = memory.get(event())
 
     assert stored["last_edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
     assert stored["occurrence_count"] == 2
 
@@ -163,7 +163,7 @@ def test_memory_survives_process_restart(tmp_path):
 
     first_memory.remember(
         event(),
-        edition_id="WORLD-PULSE-EN-2026-08-30-0700",
+        edition_id="AROUND-THE-MAIN-EN-2026-08-30-0700",
     )
 
     first_memory.close()
@@ -176,7 +176,7 @@ def test_memory_survives_process_restart(tmp_path):
 
     assert stored["occurrence_count"] == 1
     assert stored["last_edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-0700"
+        "AROUND-THE-MAIN-EN-2026-08-30-0700"
     )
 
     second_memory.close()
@@ -240,11 +240,11 @@ def test_edition_history_records_event_usage(tmp_path):
 
     memory.remember(
         event(),
-        edition_id="WORLD-PULSE-EN-2026-08-30-0700",
+        edition_id="AROUND-THE-MAIN-EN-2026-08-30-0700",
     )
 
     assert memory.edition_history(event()) == [
-        "WORLD-PULSE-EN-2026-08-30-0700"
+        "AROUND-THE-MAIN-EN-2026-08-30-0700"
     ]
 
     memory.close()
@@ -257,23 +257,23 @@ def test_edition_history_keeps_multiple_editions(tmp_path):
 
     memory.remember(
         event(),
-        edition_id="WORLD-PULSE-EN-2026-08-30-0700",
+        edition_id="AROUND-THE-MAIN-EN-2026-08-30-0700",
     )
 
     memory.remember(
         event(),
-        edition_id="WORLD-PULSE-EN-2026-08-30-1300",
+        edition_id="AROUND-THE-MAIN-EN-2026-08-30-1300",
     )
 
     memory.remember(
         event(),
-        edition_id="WORLD-PULSE-EN-2026-08-30-2000",
+        edition_id="AROUND-THE-MAIN-EN-2026-08-30-2000",
     )
 
     assert memory.edition_history(event()) == [
-        "WORLD-PULSE-EN-2026-08-30-0700",
-        "WORLD-PULSE-EN-2026-08-30-1300",
-        "WORLD-PULSE-EN-2026-08-30-2000",
+        "AROUND-THE-MAIN-EN-2026-08-30-0700",
+        "AROUND-THE-MAIN-EN-2026-08-30-1300",
+        "AROUND-THE-MAIN-EN-2026-08-30-2000",
     ]
 
     memory.close()
@@ -284,7 +284,7 @@ def test_same_event_is_not_duplicated_in_same_edition(tmp_path):
         tmp_path / "events.sqlite3"
     )
 
-    edition_id = "WORLD-PULSE-EN-2026-08-30-0700"
+    edition_id = "AROUND-THE-MAIN-EN-2026-08-30-0700"
 
     memory.remember(
         event(),
@@ -310,12 +310,12 @@ def test_edition_history_survives_process_restart(tmp_path):
 
     first_memory.remember(
         event(),
-        edition_id="WORLD-PULSE-EN-2026-08-30-0700",
+        edition_id="AROUND-THE-MAIN-EN-2026-08-30-0700",
     )
 
     first_memory.remember(
         event(),
-        edition_id="WORLD-PULSE-EN-2026-08-30-1300",
+        edition_id="AROUND-THE-MAIN-EN-2026-08-30-1300",
     )
 
     first_memory.close()
@@ -323,18 +323,18 @@ def test_edition_history_survives_process_restart(tmp_path):
     second_memory = EventMemory(db_path)
 
     assert second_memory.edition_history(event()) == [
-        "WORLD-PULSE-EN-2026-08-30-0700",
-        "WORLD-PULSE-EN-2026-08-30-1300",
+        "AROUND-THE-MAIN-EN-2026-08-30-0700",
+        "AROUND-THE-MAIN-EN-2026-08-30-1300",
     ]
 
     assert second_memory.used_in_edition(
         event(),
-        "WORLD-PULSE-EN-2026-08-30-0700",
+        "AROUND-THE-MAIN-EN-2026-08-30-0700",
     ) is True
 
     assert second_memory.used_in_edition(
         event(),
-        "WORLD-PULSE-EN-2026-08-30-2000",
+        "AROUND-THE-MAIN-EN-2026-08-30-2000",
     ) is False
 
     second_memory.close()

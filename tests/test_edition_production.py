@@ -25,7 +25,7 @@ class MockPublisher:
 
 def edition():
     return {
-        "edition_id": "WORLD-PULSE-EN-2026-08-30-1300",
+        "edition_id": "AROUND-THE-MAIN-EN-2026-08-30-1300",
         "edition_type": "WORLD_PULSE",
         "event_count": 1,
         "top_story": {
@@ -57,7 +57,7 @@ def test_publish_edition_builds_package_and_delivers():
 
     assert result["status"] == COMPLETED
     assert result["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
 
     assert result["publication"]["telegram"]["text"]

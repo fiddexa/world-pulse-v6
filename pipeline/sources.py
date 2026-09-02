@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Source Registry
+AROUND THE MAIN v6 - Source Registry
 
 Central registry and reputation model for information sources.
 

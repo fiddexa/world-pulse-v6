@@ -60,7 +60,7 @@ def test_scheduler_runs_correct_slot():
     assert result["status"] == COMPLETED_RESULT
 
     assert result["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
 
     assert result["edition_time"] == "13:00"
@@ -112,7 +112,7 @@ def test_scheduler_marks_running_before_execution():
     edition_memory = EditionMemory(":memory:")
 
     edition_id = (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
 
     assert edition_memory.start(edition_id) is True
@@ -155,7 +155,7 @@ def test_scheduler_handles_previous_day_slot():
     assert result["status"] == COMPLETED_RESULT
 
     assert result["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-29-2000"
+        "AROUND-THE-MAIN-EN-2026-08-29-2000"
     )
 
     edition_memory.close()
@@ -206,15 +206,15 @@ def test_scheduler_supports_all_three_slots():
     )
 
     assert morning["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-0700"
+        "AROUND-THE-MAIN-EN-2026-08-30-0700"
     )
 
     assert afternoon["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
 
     assert evening["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-2000"
+        "AROUND-THE-MAIN-EN-2026-08-30-2000"
     )
 
     edition_memory.close()
@@ -255,7 +255,7 @@ def test_failed_scheduler_execution_is_recorded(
         )
 
     assert edition_memory.status(
-        "WORLD-PULSE-EN-2026-08-30-2000"
+        "AROUND-THE-MAIN-EN-2026-08-30-2000"
     ) == FAILED
 
     edition_memory.close()
@@ -289,7 +289,7 @@ def test_failed_edition_does_not_report_success(
         )
 
     assert edition_memory.status(
-        "WORLD-PULSE-EN-2026-08-30-2000"
+        "AROUND-THE-MAIN-EN-2026-08-30-2000"
     ) == FAILED
 
     edition_memory.close()
@@ -314,7 +314,7 @@ def test_scheduler_uses_custom_language():
     )
 
     assert result["edition_id"] == (
-        "WORLD-PULSE-FR-2026-08-30-1300"
+        "AROUND-THE-MAIN-FR-2026-08-30-1300"
     )
 
     edition_memory.close()

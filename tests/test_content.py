@@ -56,6 +56,38 @@ def test_content_contains_summary():
     )
 
 
+def test_content_contains_why_it_matters():
+    event = _event()
+    event["why_it_matters"] = (
+        "The earthquake affects communities in Nepal."
+    )
+
+    result = build_content(event)
+
+    assert result["content"]["why_it_matters"] == (
+        "The earthquake affects communities in Nepal."
+    )
+
+
+def test_why_it_matters_can_come_from_article():
+    event = _event()
+    event["articles"][0]["why_it_matters"] = (
+        "The event affects communities in Nepal."
+    )
+
+    result = build_content(event)
+
+    assert result["content"]["why_it_matters"] == (
+        "The event affects communities in Nepal."
+    )
+
+
+def test_why_it_matters_is_empty_when_not_supplied():
+    result = build_content(_event())
+
+    assert result["content"]["why_it_matters"] == ""
+
+
 def test_content_contains_section():
     result = build_content(_event())
 

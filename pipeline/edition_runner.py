@@ -1,7 +1,7 @@
 """
-WORLD PULSE v6 - Edition Runner
+AROUND THE MAIN v6 - Edition Runner
 
-Runs one deterministic WORLD PULSE edition.
+Runs one deterministic AROUND THE MAIN edition.
 
 This layer:
 - receives the edition date and time explicitly, or resolves them
@@ -46,9 +46,10 @@ def run_edition(
     event_memory=None,
     edition_memory=None,
     language="en",
+    exclude_ignored=False,
 ):
     """
-    Build one WORLD PULSE edition.
+    Build one AROUND THE MAIN edition.
 
     Two identity modes are supported.
 
@@ -116,6 +117,7 @@ def run_edition(
             edition_time=edition_time,
             event_memory=event_memory,
             editorial_time=editorial_time,
+            exclude_ignored=exclude_ignored,
         )
 
     edition_id = build_edition_id(
@@ -150,6 +152,7 @@ def run_edition(
             edition_time=edition_time,
             event_memory=event_memory,
             editorial_time=editorial_time,
+            exclude_ignored=exclude_ignored,
         )
 
         if owns_execution:

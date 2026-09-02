@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Event Clustering
+AROUND THE MAIN v6 - Event Clustering
 
 Conservative clustering of news articles into real-world events.
 """

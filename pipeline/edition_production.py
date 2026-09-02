@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Edition Production Orchestrator
+AROUND THE MAIN v6 - Edition Production Orchestrator
 
 Connects an already-built production edition to the
 edition-level publication and Telegram delivery layers.
@@ -29,7 +29,7 @@ def publish_edition(
     publisher=None,
 ) -> dict:
     """
-    Build and publish one WORLD PULSE edition.
+    Build and publish one AROUND THE MAIN edition.
 
     Returns both the publication package and delivery result.
 

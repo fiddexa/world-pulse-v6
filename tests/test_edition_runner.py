@@ -47,7 +47,7 @@ def test_run_edition_builds_stable_edition():
     )
 
     assert edition["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-0700"
+        "AROUND-THE-MAIN-EN-2026-08-30-0700"
     )
 
     assert edition["event_count"] == 1
@@ -83,7 +83,7 @@ def test_run_edition_records_event_in_memory():
     assert memory.has_seen(event) is True
 
     assert memory.edition_history(event) == [
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     ]
 
     memory.close()
@@ -115,7 +115,7 @@ def test_run_edition_uses_supplied_memory():
     assert stored is not None
 
     assert stored["last_edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-2000"
+        "AROUND-THE-MAIN-EN-2026-08-30-2000"
     )
 
     memory.close()
@@ -140,7 +140,7 @@ def test_run_edition_resolves_slot_from_current_time():
     )
 
     assert edition["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
 
     assert edition_memory.status(
@@ -169,7 +169,7 @@ def test_run_edition_resolves_previous_day_before_first_slot():
     )
 
     assert edition["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-29-2000"
+        "AROUND-THE-MAIN-EN-2026-08-29-2000"
     )
 
     assert edition_memory.status(
@@ -243,7 +243,7 @@ def test_run_edition_skips_duplicate_edition():
     assert second is None
 
     assert edition_memory.status(
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     ) == COMPLETED
 
     memory.close()
@@ -274,11 +274,11 @@ def test_different_edition_slots_are_independent():
     assert afternoon is not None
 
     assert edition_memory.status(
-        "WORLD-PULSE-EN-2026-08-30-0700"
+        "AROUND-THE-MAIN-EN-2026-08-30-0700"
     ) == COMPLETED
 
     assert edition_memory.status(
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     ) == COMPLETED
 
     memory.close()
@@ -312,7 +312,7 @@ def test_failed_edition_is_recorded(monkeypatch):
         )
 
     assert edition_memory.status(
-        "WORLD-PULSE-EN-2026-08-30-2000"
+        "AROUND-THE-MAIN-EN-2026-08-30-2000"
     ) == FAILED
 
     memory.close()

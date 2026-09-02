@@ -1,7 +1,7 @@
 """
-WORLD PULSE v6 - Edition Slot Resolver
+AROUND THE MAIN v6 - Edition Slot Resolver
 
-Resolves the active WORLD PULSE edition slot for a given moment.
+Resolves the active AROUND THE MAIN edition slot for a given moment.
 
 The resolver always operates in the canonical production timezone:
 America/New_York.

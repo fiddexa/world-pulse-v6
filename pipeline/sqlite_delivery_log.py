@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - SQLite Delivery Log
+AROUND THE MAIN v6 - SQLite Delivery Log
 
 Persistent delivery state for idempotent publishing decisions.
 

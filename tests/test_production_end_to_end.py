@@ -73,7 +73,7 @@ def test_production_edition_can_be_delivered():
     edition = production_result["edition"]
 
     assert edition["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
 
     delivery_result = deliver_production_edition(
@@ -84,7 +84,7 @@ def test_production_edition_can_be_delivered():
 
     assert delivery_result["status"] == "COMPLETED"
     assert delivery_result["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
 
     assert delivery_result["delivery"]["status"] == "SENT"

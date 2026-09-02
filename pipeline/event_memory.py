@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Persistent Event Memory
+AROUND THE MAIN v6 - Persistent Event Memory
 
 Stores deterministic event memory and edition history in SQLite.
 
@@ -320,15 +320,19 @@ class EventMemory:
 
         parts = edition_id.split("-")
 
-        if len(parts) != 7:
+        if len(parts) != 8:
             return False
 
-        if parts[0] != "WORLD" or parts[1] != "PULSE":
+        if (
+            parts[0] != "AROUND"
+            or parts[1] != "THE"
+            or parts[2] != "MAIN"
+        ):
             return False
 
-        language = parts[2]
-        publication_date = "-".join(parts[3:6])
-        edition_time_raw = parts[6]
+        language = parts[3]
+        publication_date = "-".join(parts[4:7])
+        edition_time_raw = parts[7]
 
         if len(edition_time_raw) != 4:
             return False

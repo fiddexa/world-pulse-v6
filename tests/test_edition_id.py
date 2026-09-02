@@ -17,7 +17,7 @@ def test_build_edition_id():
     )
 
     assert result == (
-        "WORLD-PULSE-EN-2026-08-30-0700"
+        "AROUND-THE-MAIN-EN-2026-08-30-0700"
     )
 
 
@@ -115,7 +115,7 @@ def test_datetime_is_converted_to_requested_timezone():
     )
 
     assert result.startswith(
-        "WORLD-PULSE-EN-2026-08-30-"
+        "AROUND-THE-MAIN-EN-2026-08-30-"
     )
 
 

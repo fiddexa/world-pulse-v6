@@ -58,7 +58,7 @@ def test_production_job_runs_one_edition():
     assert result["status"] == COMPLETED_RESULT
 
     assert result["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
 
     assert result["edition_time"] == "13:00"
@@ -124,7 +124,7 @@ def test_production_job_supports_morning_slot():
     )
 
     assert result["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-0700"
+        "AROUND-THE-MAIN-EN-2026-08-30-0700"
     )
 
     edition_memory.close()
@@ -149,7 +149,7 @@ def test_production_job_supports_evening_slot():
     )
 
     assert result["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-2000"
+        "AROUND-THE-MAIN-EN-2026-08-30-2000"
     )
 
     edition_memory.close()
@@ -226,7 +226,7 @@ def test_production_job_collects_from_feeds(monkeypatch):
 
     assert result["status"] == COMPLETED_RESULT
     assert result["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
 
     edition_memory.close()
@@ -294,7 +294,7 @@ def test_production_job_uses_source_connectors_when_feeds_not_supplied(
 
     assert result["status"] == COMPLETED_RESULT
     assert result["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
     assert calls == [12]
 
@@ -372,7 +372,7 @@ def test_production_job_uses_configured_feeds(
     assert result["status"] == COMPLETED_RESULT
 
     assert result["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
 
     edition_memory.close()
@@ -474,7 +474,7 @@ def test_production_job_can_run_with_empty_connector_result(
     assert calls == [15]
 
     assert result["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
 
     edition_memory.close()
