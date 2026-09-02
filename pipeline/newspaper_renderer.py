@@ -1127,85 +1127,6 @@ def render_newspaper(
         news_y += 118
 
     # ------------------------------------------------
-    # IN FOCUS
-    # ------------------------------------------------
-
-    draw.text(
-        (right_left, lower_y),
-        "IN FOCUS",
-        font=_font(21, bold=True),
-        fill=BLACK,
-    )
-
-    draw.line(
-        (
-            right_left + 125,
-            lower_y + 13,
-            WIDTH - MARGIN,
-            lower_y + 13,
-        ),
-        fill=RED,
-        width=4,
-    )
-
-    focus_event = (
-        briefs[4]
-        if len(briefs) > 4
-        else (
-            mains[0]
-            if mains
-            else top
-        )
-    )
-
-    focus_top = lower_y + 40
-    focus_height = 230
-
-    if focus_event:
-
-        _paste(
-            canvas,
-            focus_event,
-            (
-                right_left,
-                focus_top,
-                WIDTH - MARGIN,
-                focus_top + focus_height,
-            ),
-            "IN FOCUS",
-        )
-
-        focus_y = (
-            focus_top
-            + focus_height
-            + 10
-        )
-
-        focus_y = _draw_block(
-            draw,
-            _title(focus_event),
-            right_left,
-            focus_y,
-            _font(20, bold=True),
-            BLACK,
-            right_width,
-            max_lines=2,
-            spacing=3,
-        )
-
-        _draw_block(
-            draw,
-            _summary(focus_event),
-            right_left,
-            focus_y + 4,
-            _font(14),
-            GRAY,
-            right_width,
-            max_lines=3,
-            spacing=3,
-        )
-
-    # ------------------------------------------------
     # LATEST DEVELOPMENTS
     # ------------------------------------------------
 
@@ -1245,13 +1166,11 @@ def render_newspaper(
 
     if latest_events:
 
-        latest_top = max(
-            news_y + 8,
-            focus_top + focus_height + 145,
-        )
+        # Keep LATEST DEVELOPMENTS beside MORE TOP NEWS.
+        latest_top = lower_y
 
-        latest_left = MARGIN
-        latest_width = left_width
+        latest_left = right_left
+        latest_width = right_width
 
         draw.text(
             (
@@ -1330,80 +1249,6 @@ def render_newspaper(
             )
 
             latest_y += 112
-
-    # ------------------------------------------------
-    # CATEGORIES — positioned AFTER lower content
-    # ------------------------------------------------
-
-    category_top = max(
-        news_y + 8,
-        focus_top
-        + focus_height
-        + 145,
-    )
-
-    category_height = 290
-
-    draw.rectangle(
-        (
-            right_left,
-            category_top,
-            WIDTH - MARGIN,
-            category_top + category_height,
-        ),
-        outline=GRAY,
-        width=2,
-    )
-
-    draw.rectangle(
-        (
-            right_left,
-            category_top,
-            WIDTH - MARGIN,
-            category_top + 42,
-        ),
-        fill=RED,
-    )
-
-    draw.text(
-        (
-            right_left + 15,
-            category_top + 8,
-        ),
-        "CATEGORIES",
-        font=_font(19, bold=True),
-        fill=WHITE,
-    )
-
-    category_y = category_top + 54
-
-    for index, category in enumerate(
-        categories
-    ):
-
-        draw.text(
-            (
-                right_left + 15,
-                category_y,
-            ),
-            category,
-            font=_font(14, bold=True),
-            fill=BLACK,
-        )
-
-        category_y += 32
-
-        if index < len(categories) - 1:
-            draw.line(
-                (
-                    right_left + 10,
-                    category_y - 7,
-                    WIDTH - MARGIN - 10,
-                    category_y - 7,
-                ),
-                fill=LIGHT_GRAY,
-                width=1,
-            )
 
     # ================================================================
     # FOOTER
