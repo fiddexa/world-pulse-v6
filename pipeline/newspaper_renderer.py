@@ -2102,7 +2102,21 @@ def _draw_section_footer(draw):
 
     draw.text(
         (MARGIN, footer_top + 130),
-        "Three times daily  ·  7:00 | 13:00 | 20:00",
+        "Three editions every day",
+        font=_font(9, bold=True),
+        fill=GRAY,
+    )
+
+    draw.text(
+        (MARGIN + 150, footer_top + 130),
+        "7:00 | 13:00 | 20:00",
+        font=_font(9),
+        fill=GRAY,
+    )
+
+    draw.text(
+        (MARGIN + 300, footer_top + 130),
+        "Minimum text. Maximum meaning.",
         font=_font(9),
         fill=GRAY,
     )
