@@ -19,6 +19,7 @@ def deliver_production_edition(
     *,
     log=None,
     publisher=None,
+    approval_manifest_path=None,
 ) -> dict:
     """
     Publish one already-built production edition.
@@ -35,6 +36,7 @@ def deliver_production_edition(
         edition,
         log=log,
         publisher=publisher,
+        approval_manifest_path=approval_manifest_path,
     )
 
     return {

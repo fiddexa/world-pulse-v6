@@ -7,6 +7,7 @@ from pipeline.edition_delivery_log import (
 from pipeline.production_delivery import (
     deliver_production_edition,
 )
+from pipeline.edition_preview import build_edition_preview, approve_edition_preview
 from pipeline.production_job import run_production_job
 from pipeline.edition_memory import EditionMemory
 from pipeline.event_memory import EventMemory
@@ -49,7 +50,7 @@ def articles():
     ]
 
 
-def test_production_edition_can_be_delivered():
+def test_production_edition_can_be_delivered(tmp_path):
     edition_memory = EditionMemory(":memory:")
     event_memory = EventMemory(":memory:")
     delivery_log = SQLiteEditionDeliveryLog(":memory:")
@@ -76,10 +77,27 @@ def test_production_edition_can_be_delivered():
         "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
 
+    preview_root = tmp_path / "preview" / edition["edition_id"]
+
+    preview_result = build_edition_preview(
+        edition,
+        preview_root,
+    )
+
+    assert preview_result["approval_status"] == "PENDING"
+
+    approved_manifest = approve_edition_preview(
+        preview_root,
+    )
+
+    assert approved_manifest["edition_id"] == edition["edition_id"]
+    assert approved_manifest["approval_status"] == "APPROVED"
+
     delivery_result = deliver_production_edition(
         edition,
         log=delivery_log,
         publisher=publisher,
+        approval_manifest_path=preview_result["manifest_path"],
     )
 
     assert delivery_result["status"] == "COMPLETED"
@@ -95,7 +113,7 @@ def test_production_edition_can_be_delivered():
     delivery_log.close()
 
 
-def test_production_edition_delivery_is_idempotent():
+def test_production_edition_delivery_is_idempotent(tmp_path):
     edition_memory = EditionMemory(":memory:")
     event_memory = EventMemory(":memory:")
     delivery_log = SQLiteEditionDeliveryLog(":memory:")
@@ -116,16 +134,29 @@ def test_production_edition_delivery_is_idempotent():
 
     edition = production_result["edition"]
 
+    preview_root = tmp_path / "preview" / edition["edition_id"]
+
+    preview_result = build_edition_preview(
+        edition,
+        preview_root,
+    )
+
+    assert preview_result["approval_status"] == "PENDING"
+
+    approve_edition_preview(preview_root)
+
     first = deliver_production_edition(
         edition,
         log=delivery_log,
         publisher=publisher,
+        approval_manifest_path=preview_result["manifest_path"],
     )
 
     second = deliver_production_edition(
         edition,
         log=delivery_log,
         publisher=publisher,
+        approval_manifest_path=preview_result["manifest_path"],
     )
 
     assert first["status"] == "COMPLETED"
