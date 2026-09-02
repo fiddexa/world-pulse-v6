@@ -112,7 +112,7 @@ def test_build_edition_from_articles_records_events_in_memory(tmp_path):
     )
 
     assert edition["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-0700"
+        "AROUND-THE-MAIN-EN-2026-08-30-0700"
     )
 
     assert edition["event_count"] == 1
@@ -128,7 +128,7 @@ def test_build_edition_from_articles_records_events_in_memory(tmp_path):
     assert memory.has_seen(event) is True
 
     assert memory.edition_history(event) == [
-        "WORLD-PULSE-EN-2026-08-30-0700"
+        "AROUND-THE-MAIN-EN-2026-08-30-0700"
     ]
 
     memory.close()
@@ -156,7 +156,7 @@ def test_build_edition_from_articles_does_not_require_event_memory():
     )
 
     assert edition["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
 
 

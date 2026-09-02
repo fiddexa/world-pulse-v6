@@ -24,15 +24,15 @@ def event():
             "decision": "STANDARD",
         },
         "content": {
-            "headline": "WORLD PULSE TEST",
+            "headline": "AROUND THE MAIN TEST",
             "published_at": "2026-08-29T10:00:00Z",
             "sources": ["test-source"],
             "affected_areas": ["test"],
         },
         "publication": {
-            "telegram": "WORLD PULSE TEST",
+            "telegram": "AROUND THE MAIN TEST",
             "website": {
-                "headline": "WORLD PULSE TEST",
+                "headline": "AROUND THE MAIN TEST",
             },
         },
     }

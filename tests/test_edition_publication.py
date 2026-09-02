@@ -94,7 +94,7 @@ def test_telegram_contains_edition_header():
 
     text = result["telegram"]["text"]
 
-    assert "WORLD PULSE" in text
+    assert "AROUND THE MAIN" in text
     assert "2026-08-29 · 23:00" in text
 
 
@@ -187,7 +187,7 @@ def test_header_uses_edition_date_and_time():
 
     text = result["telegram"]["text"]
 
-    assert "🌍 WORLD PULSE" in text
+    assert "🌍 AROUND THE MAIN" in text
     assert "2026-08-30 · 13:00" in text
 
 

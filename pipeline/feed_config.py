@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Feed Configuration
+AROUND THE MAIN v6 - Feed Configuration
 
 Production RSS/Atom feed configuration.
 

@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Delivery Log
+AROUND THE MAIN v6 - Delivery Log
 
 Provides deterministic event fingerprints and in-memory delivery
 state for idempotent publishing decisions.

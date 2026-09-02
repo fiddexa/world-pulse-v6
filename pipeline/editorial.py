@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Editorial Decision Layer
+AROUND THE MAIN v6 - Editorial Decision Layer
 
 Converts verification, intelligence, and ranking signals into a
 conservative publication decision.
@@ -126,6 +126,91 @@ def _article_count(event: Any) -> int:
     )
 
 
+def _maximum_casualty_number(event: Any) -> float:
+    """
+    Return the largest casualty figure available for the event.
+    """
+
+    if not isinstance(event, dict):
+        return 0.0
+
+    intelligence = _intelligence(event)
+
+    value = intelligence.get(
+        "maximum_casualty_number",
+        0.0,
+    )
+
+    return max(
+        0.0,
+        _safe_number(value),
+    )
+
+
+def _is_major_humanitarian_event(event: Any) -> bool:
+    """
+    Identify exceptional events with direct large-scale
+    human consequences.
+
+    This is an editorial prominence signal, not a truth signal.
+    """
+
+    if not isinstance(event, dict):
+        return False
+
+    intelligence = _intelligence_score(event)
+    casualties = _maximum_casualty_number(event)
+
+    event_types = set()
+
+    direct_types = event.get("event_types")
+
+    if isinstance(direct_types, (list, tuple, set)):
+        event_types.update(
+            str(value).strip().lower()
+            for value in direct_types
+            if value
+        )
+
+    for article in event.get("articles", []):
+        if not isinstance(article, dict):
+            continue
+
+        values = article.get("event_types")
+
+        if isinstance(values, (list, tuple, set)):
+            event_types.update(
+                str(value).strip().lower()
+                for value in values
+                if value
+            )
+
+    direct_harm = {
+        "casualty",
+        "death",
+        "attack",
+        "military_conflict",
+        "missile_strike",
+        "airstrike",
+        "drone_attack",
+        "bombing",
+        "explosion",
+        "earthquake",
+        "tsunami",
+        "volcano",
+        "hurricane",
+        "flood",
+        "wildfire",
+        "disease",
+    }
+
+    return (
+        casualties >= 500
+        and intelligence >= 70.0
+        and bool(event_types & direct_harm)
+    )
+
+
 def editorial_decision(event: Any) -> str:
     """
     Return the recommended publication priority.
@@ -153,6 +238,9 @@ def editorial_decision(event: Any) -> str:
     ):
         return FRONT_PAGE
 
+
+    if _is_major_humanitarian_event(event):
+        return FRONT_PAGE
     if (
         score >= 85.0
         and verification_level in {

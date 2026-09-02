@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Verification Layer
+AROUND THE MAIN v6 - Verification Layer
 
 Evaluates how strongly an event is independently corroborated.
 

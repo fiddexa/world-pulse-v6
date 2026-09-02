@@ -6,7 +6,7 @@ from pipeline.edition_memory import (
 )
 
 
-EDITION_ID = "WORLD-PULSE-EN-2026-08-30-1300"
+EDITION_ID = "AROUND-THE-MAIN-EN-2026-08-30-1300"
 
 
 def test_memory_starts_empty(tmp_path):
@@ -136,8 +136,8 @@ def test_different_editions_are_independent(tmp_path):
         tmp_path / "editions.sqlite3"
     )
 
-    first = "WORLD-PULSE-EN-2026-08-30-0700"
-    second = "WORLD-PULSE-EN-2026-08-30-1300"
+    first = "AROUND-THE-MAIN-EN-2026-08-30-0700"
+    second = "AROUND-THE-MAIN-EN-2026-08-30-1300"
 
     assert memory.start(first) is True
     assert memory.start(second) is True

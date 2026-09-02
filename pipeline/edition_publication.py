@@ -1,8 +1,8 @@
 """
-WORLD PULSE v6 - Edition Publication Layer
+AROUND THE MAIN v6 - Edition Publication Layer
 
 Builds a deterministic, channel-specific publication package
-from an already-built WORLD PULSE edition.
+from an already-built AROUND THE MAIN edition.
 
 This layer:
 - does not collect news;
@@ -182,7 +182,7 @@ def _edition_datetime(edition: dict) -> str:
 def _build_header(edition: dict) -> str:
     edition_datetime = _edition_datetime(edition)
 
-    parts = ["🌍 WORLD PULSE"]
+    parts = ["🌍 AROUND THE MAIN"]
 
     if edition_datetime:
         parts.append(edition_datetime)

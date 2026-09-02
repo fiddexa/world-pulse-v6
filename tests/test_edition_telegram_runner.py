@@ -29,7 +29,7 @@ def edition():
         "edition_type": "WORLD_PULSE",
         "telegram": {
             "channel": TELEGRAM,
-            "text": "WORLD PULSE\nTest edition",
+            "text": "AROUND THE MAIN\nTest edition",
         },
     }
 

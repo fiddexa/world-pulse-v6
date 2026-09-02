@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Feed Health
+AROUND THE MAIN v6 - Feed Health
 
 Health checks for configured RSS/Atom feeds.
 

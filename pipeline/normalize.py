@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Text normalization layer.
+AROUND THE MAIN v6 - Text normalization layer.
 """
 
 import re

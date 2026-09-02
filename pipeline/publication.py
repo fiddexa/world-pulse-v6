@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Publication Layer
+AROUND THE MAIN v6 - Publication Layer
 
 Prepares deterministic channel-specific publication payloads from
 already-processed content.

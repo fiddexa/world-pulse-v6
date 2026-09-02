@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Telegram Runner
+AROUND THE MAIN v6 - Telegram Runner
 
 Explicit production entry point for Telegram delivery.
 

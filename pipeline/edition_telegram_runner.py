@@ -1,7 +1,7 @@
 """
-WORLD PULSE v6 - Edition Telegram Runner
+AROUND THE MAIN v6 - Edition Telegram Runner
 
-Publishes one complete WORLD PULSE edition publication package
+Publishes one complete AROUND THE MAIN edition publication package
 to Telegram.
 
 Event-level Telegram delivery remains handled by telegram_runner.py.

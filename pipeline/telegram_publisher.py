@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Telegram Publisher
+AROUND THE MAIN v6 - Telegram Publisher
 
 Publishes prepared Telegram content through the Telegram Bot API.
 

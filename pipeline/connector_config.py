@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Connector Configuration
+AROUND THE MAIN v6 - Connector Configuration
 
 Defines which source connector types are enabled in production.
 

@@ -1,7 +1,7 @@
 """
-WORLD PULSE v6 - Persistent Edition Memory
+AROUND THE MAIN v6 - Persistent Edition Memory
 
-Stores persistent execution state for WORLD PULSE editions.
+Stores persistent execution state for AROUND THE MAIN editions.
 
 Edition identity is based on the stable Edition ID.
 

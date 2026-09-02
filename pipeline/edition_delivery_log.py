@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Edition Delivery Log
+AROUND THE MAIN v6 - Edition Delivery Log
 
 Persistent edition-level idempotency for channel delivery.
 

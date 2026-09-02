@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Publisher Interface
+AROUND THE MAIN v6 - Publisher Interface
 
 Defines a small publisher abstraction for external channels.
 

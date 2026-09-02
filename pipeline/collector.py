@@ -165,7 +165,7 @@ def fetch_feed(
         ) as response:
             data = response.read()
 
-        first_seen_at = datetime.now(timezone.utc).isoformat()
+            first_seen_at = None
 
         if data[:2] == b"\x1f\x8b":
             data = gzip.decompress(data)
