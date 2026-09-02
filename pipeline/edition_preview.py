@@ -4,12 +4,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+from pipeline.edition_approval import (
+    APPROVAL_APPROVED,
+    APPROVAL_PENDING,
+    APPROVAL_REJECTED,
+)
 from pipeline.edition_rendering import render_edition
-
-
-APPROVAL_PENDING = "PENDING"
-APPROVAL_APPROVED = "APPROVED"
-APPROVAL_REJECTED = "REJECTED"
 
 
 def build_edition_preview(

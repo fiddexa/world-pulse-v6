@@ -34,14 +34,20 @@ def edition():
     }
 
 
-def test_edition_is_sent():
+def test_edition_is_sent(tmp_path):
+    from tests.conftest import create_approved_manifest
     publisher = MockPublisher()
     log = SQLiteEditionDeliveryLog(":memory:")
+    approval_manifest = create_approved_manifest(
+        tmp_path,
+        edition()["edition_id"],
+    )
 
     result = publish_edition_to_telegram(
         edition(),
         log=log,
         publisher=publisher,
+        approval_manifest_path=approval_manifest,
     )
 
     assert result["status"] == SENT
@@ -52,20 +58,27 @@ def test_edition_is_sent():
     log.close()
 
 
-def test_edition_is_not_sent_twice():
+def test_edition_is_not_sent_twice(tmp_path):
+    from tests.conftest import create_approved_manifest
     publisher = MockPublisher()
     log = SQLiteEditionDeliveryLog(":memory:")
+    approval_manifest = create_approved_manifest(
+        tmp_path,
+        edition()["edition_id"],
+    )
 
     first = publish_edition_to_telegram(
         edition(),
         log=log,
         publisher=publisher,
+        approval_manifest_path=approval_manifest,
     )
 
     second = publish_edition_to_telegram(
         edition(),
         log=log,
         publisher=publisher,
+        approval_manifest_path=approval_manifest,
     )
 
     assert first["status"] == SENT
@@ -75,9 +88,18 @@ def test_edition_is_not_sent_twice():
     log.close()
 
 
-def test_different_editions_are_independent():
+def test_different_editions_are_independent(tmp_path):
+    from tests.conftest import create_approved_manifest
     publisher = MockPublisher()
     log = SQLiteEditionDeliveryLog(":memory:")
+    first_approval = create_approved_manifest(
+        tmp_path,
+        edition()["edition_id"],
+    )
+    second_approval = create_approved_manifest(
+        tmp_path,
+        "20260830-0700-en",
+    )
 
     first_edition = edition()
 
@@ -90,17 +112,38 @@ def test_different_editions_are_independent():
         first_edition,
         log=log,
         publisher=publisher,
+        approval_manifest_path=first_approval,
     )
 
     second = publish_edition_to_telegram(
         second_edition,
         log=log,
         publisher=publisher,
+        approval_manifest_path=second_approval,
     )
 
     assert first["status"] == SENT
     assert second["status"] == SENT
     assert len(publisher.published) == 2
+
+    log.close()
+
+
+
+def test_edition_is_blocked_without_approval():
+    publisher = MockPublisher()
+    log = SQLiteEditionDeliveryLog(":memory:")
+
+    result = publish_edition_to_telegram(
+        edition(),
+        log=log,
+        publisher=publisher,
+    )
+
+    assert result["status"] == "FAILED"
+    assert result["reason"] == "APPROVAL_NOT_APPROVED"
+    assert result["approval_status"] is None
+    assert publisher.published == []
 
     log.close()
 
@@ -122,24 +165,50 @@ def test_missing_edition_id_is_rejected():
     assert result["reason"] == "MISSING_EDITION_ID"
 
 
-def test_missing_telegram_content_is_rejected():
+def test_missing_telegram_content_is_rejected(tmp_path):
+    from tests.conftest import create_approved_manifest
     item = edition()
     item["telegram"]["text"] = ""
+    approval_manifest = create_approved_manifest(
+        tmp_path,
+        item["edition_id"],
+    )
 
-    result = publish_edition_to_telegram(item)
+    result = publish_edition_to_telegram(
+        item,
+        approval_manifest_path=approval_manifest,
+    )
 
     assert result["status"] == "FAILED"
     assert result["reason"] == "NO_CONTENT"
 
 
-def test_batch_uses_same_log():
+def test_batch_uses_same_log(tmp_path):
+    from tests.conftest import create_approved_manifest
+
     publisher = MockPublisher()
     log = SQLiteEditionDeliveryLog(":memory:")
 
+    first_edition = edition()
+    second_edition = edition()
+
+    first_approval = create_approved_manifest(
+        tmp_path,
+        first_edition["edition_id"],
+    )
+    second_approval = create_approved_manifest(
+        tmp_path,
+        second_edition["edition_id"],
+    )
+
     result = publish_editions_to_telegram(
-        [edition(), edition()],
+        [first_edition, second_edition],
         log=log,
         publisher=publisher,
+        approval_manifest_paths=[
+            first_approval,
+            second_approval,
+        ],
     )
 
     assert result[0]["status"] == SENT

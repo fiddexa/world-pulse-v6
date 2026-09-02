@@ -43,14 +43,20 @@ def edition():
     }
 
 
-def test_production_delivery_sends_edition():
+def test_production_delivery_sends_edition(tmp_path):
+    from tests.conftest import create_approved_manifest
     publisher = MockPublisher()
     log = SQLiteEditionDeliveryLog(":memory:")
+    approval_manifest = create_approved_manifest(
+        tmp_path,
+        edition()["edition_id"],
+    )
 
     result = deliver_production_edition(
         edition(),
         log=log,
         publisher=publisher,
+        approval_manifest_path=approval_manifest,
     )
 
     assert result["status"] == "COMPLETED"
@@ -65,25 +71,50 @@ def test_production_delivery_sends_edition():
     log.close()
 
 
-def test_production_delivery_is_idempotent():
+def test_production_delivery_is_idempotent(tmp_path):
+    from tests.conftest import create_approved_manifest
     publisher = MockPublisher()
     log = SQLiteEditionDeliveryLog(":memory:")
+    approval_manifest = create_approved_manifest(
+        tmp_path,
+        edition()["edition_id"],
+    )
 
     first = deliver_production_edition(
         edition(),
         log=log,
         publisher=publisher,
+        approval_manifest_path=approval_manifest,
     )
 
     second = deliver_production_edition(
         edition(),
         log=log,
         publisher=publisher,
+        approval_manifest_path=approval_manifest,
     )
 
     assert first["status"] == "COMPLETED"
     assert second["status"] == "SKIPPED"
     assert len(publisher.published) == 1
+
+    log.close()
+
+
+
+def test_production_delivery_is_blocked_without_approval():
+    publisher = MockPublisher()
+    log = SQLiteEditionDeliveryLog(":memory:")
+
+    result = deliver_production_edition(
+        edition(),
+        log=log,
+        publisher=publisher,
+    )
+
+    assert result["status"] == "FAILED"
+    assert result["edition_id"] == edition()["edition_id"]
+    assert publisher.published == []
 
     log.close()
 
@@ -95,7 +126,8 @@ def test_invalid_edition_is_rejected():
     assert result["reason"] == "INVALID_EDITION"
 
 
-def test_production_delivery_does_not_modify_edition():
+def test_production_delivery_does_not_modify_edition(tmp_path):
+    from tests.conftest import create_approved_manifest
     item = edition()
 
     before = {
@@ -106,11 +138,16 @@ def test_production_delivery_does_not_modify_edition():
 
     publisher = MockPublisher()
     log = SQLiteEditionDeliveryLog(":memory:")
+    approval_manifest = create_approved_manifest(
+        tmp_path,
+        item["edition_id"],
+    )
 
     deliver_production_edition(
         item,
         log=log,
         publisher=publisher,
+        approval_manifest_path=approval_manifest,
     )
 
     assert item["edition_id"] == before["edition_id"]

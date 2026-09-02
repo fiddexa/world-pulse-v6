@@ -12,6 +12,10 @@ from pipeline.edition_delivery_log import (
     TELEGRAM,
     SQLiteEditionDeliveryLog,
 )
+from pipeline.edition_approval import (
+    APPROVAL_APPROVED,
+    get_edition_approval_status,
+)
 from pipeline.telegram_factory import get_telegram_publisher
 
 
@@ -62,6 +66,7 @@ def publish_edition_to_telegram(
     *,
     log=None,
     publisher=None,
+    approval_manifest_path=None,
 ):
     """
     Publish one complete edition to Telegram.
@@ -85,6 +90,20 @@ def publish_edition_to_telegram(
             "status": "FAILED",
             "channel": TELEGRAM,
             "reason": "MISSING_EDITION_ID",
+        }
+
+    approval_status = get_edition_approval_status(
+        edition_id,
+        approval_manifest_path,
+    )
+
+    if approval_status != APPROVAL_APPROVED:
+        return {
+            "status": "FAILED",
+            "channel": TELEGRAM,
+            "edition_id": edition_id,
+            "reason": "APPROVAL_NOT_APPROVED",
+            "approval_status": approval_status,
         }
 
     text = _telegram_text(
@@ -177,6 +196,7 @@ def publish_editions_to_telegram(
     *,
     log=None,
     publisher=None,
+    approval_manifest_paths=None,
 ):
     """
     Publish multiple edition publication packages.
@@ -189,15 +209,22 @@ def publish_editions_to_telegram(
 
     results = []
 
-    for edition in editions:
+    for index, edition in enumerate(editions):
         if not isinstance(edition, dict):
             continue
+
+        approval_manifest_path = None
+
+        if isinstance(approval_manifest_paths, (list, tuple)):
+            if index < len(approval_manifest_paths):
+                approval_manifest_path = approval_manifest_paths[index]
 
         results.append(
             publish_edition_to_telegram(
                 edition,
                 log=log,
                 publisher=publisher,
+                approval_manifest_path=approval_manifest_path,
             )
         )
 
