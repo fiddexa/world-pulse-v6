@@ -89,13 +89,13 @@ def render_edition(
                 physical_page_number += 1
 
     mobile_path = (
-        mobile_root
-        / "mobile.png"
+    mobile_root
+    / "mobile.png"
     )
 
-    render_mobile_edition(
-        edition,
-        mobile_path,
+    rendered_mobile = render_mobile_edition(
+    edition,
+    mobile_path,
     )
 
     return {
@@ -110,6 +110,12 @@ def render_edition(
             "files": full_files,
         },
         "mobile_edition": {
-            "file": str(mobile_path),
-        },
+    "file": str(mobile_path),
+    "pages": [
+        str(path)
+        for path in sorted(
+            mobile_root.glob("page-*.png")
+        )
+    ],
+},
     }

@@ -59,6 +59,10 @@ def build_edition_preview(
         "edition_label": edition.get(
             "edition_label"
         ),
+        "event_count": edition.get(
+            "event_count",
+            0,
+        ),
         "approval_status": APPROVAL_PENDING,
         "full_edition": rendered.get(
             "full_edition",
