@@ -5,3 +5,6 @@ pycache/
 venv/
 .env
 data/
+
+# Local Piper TTS voice models
+tools/piper/voices/
