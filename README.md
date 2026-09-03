@@ -895,3 +895,83 @@ Future approved architectural or product decisions must be reflected in the mast
 > **MINIMUM TEXT. MAXIMUM MEANING.**
 
 > **VERIFIED FACTS. CLEAR SOURCES. NO AUTOMATED OPINION.**
+
+## Mobile Edition Layout
+
+Mobile Edition is a paginated presentation of one Edition.
+
+### Page 01
+
+Page 01 uses the unified branded header image:
+
+assets/mobile-header.png
+
+The separate logo.png is not rendered in the mobile header.
+
+Page 01 contains:
+- branded header;
+- edition number;
+- publication date;
+- edition name;
+- PAGE 01;
+- edition content;
+- DAILY BRIEF footer.
+
+### Pages 02+
+
+Pages 02 and later do not repeat the branded header image.
+
+They use a compact top line with:
+- edition name on the left;
+- PAGE XX on the right;
+- horizontal divider below.
+
+The content follows below the compact header.
+
+### Edition Names
+
+The supported editions are:
+
+- Morning Briefing
+- Midday Update
+- Evening Round-up
+
+The appropriate edition name is displayed according to the active Edition.
+
+### Page Numbers
+
+Page numbers are generated dynamically:
+
+PAGE 01
+PAGE 02
+PAGE 03
+...
+
+Each rendered page receives its own page_number.
+
+### Footer
+
+Every Mobile Edition page uses the same DAILY BRIEF footer.
+
+The footer contains:
+- DAILY BRIEF;
+- The most important stories, delivered in brief.;
+- GLOBAL NEWS • AROUND THE MAIN;
+- Telegram @aroundthemain;
+- X @aroundthemain;
+- STAY INFORMED. STAY AHEAD.
+
+### Visual System
+
+All pages of one edition use the same visual system:
+
+- newspaper-style cream/paper background;
+- black typography;
+- red accent;
+- consistent dividers and section bars;
+- consistent footer;
+- consistent typography and spacing.
+
+The first page provides the full brand presentation. Subsequent pages use a clean compact layout while remaining visually connected to Page 01.
+
+ONE EDITION → MULTIPLE PAGES → ONE CONSISTENT VISUAL SYSTEM
