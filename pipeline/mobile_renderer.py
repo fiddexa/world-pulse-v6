@@ -13,6 +13,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 BRAND_NAME = "AROUND THE MAIN"
 TELEGRAM_HANDLE = "@aroundthemain"
+X_HANDLE = "@aroundthemain"
 
 RED = (190, 0, 0)
 BLACK = (0, 0, 0)
@@ -24,7 +25,12 @@ WIDTH = 900
 MARGIN = 36
 CARD_GAP = 28
 
+# Mobile Telegram page.
+# Cards are never split between pages.
+MOBILE_PAGE_HEIGHT = 1200
+
 LOGO_PATH = Path("assets/logo.png")
+X_LOGO_PATH = Path("assets/x/logo-black.png")
 
 
 # =====================================================================
@@ -159,6 +165,10 @@ def _image_path(event: dict) -> Path | None:
             return path
 
     return None
+
+
+def _has_real_image(event: dict) -> bool:
+    return _image_path(event) is not None
 
 
 def _load_image(
@@ -390,10 +400,10 @@ def _event_category(event: dict) -> str:
 
 def _card_height(event: dict) -> int:
     """
-    Calculate card height from the actual amount of content.
+    Calculate mobile card height from the actual content.
 
-    The mobile renderer uses the same editorial fields as the edition,
-    but reserves enough vertical space for every rendered section.
+    Real images receive a compact image area.
+    Stories without a real image do not reserve image space.
     """
 
     dummy = Image.new("RGB", (WIDTH, 2000), WHITE)
@@ -415,13 +425,6 @@ def _card_height(event: dict) -> int:
         text_width,
     )[:5]
 
-    why_lines = _wrap(
-        draw,
-        _why_it_matters(event),
-        _font(15),
-        text_width - 14,
-    )[:3]
-
     sources_text = "  •  ".join(_sources(event)[:3])
 
     source_lines = _wrap(
@@ -433,10 +436,18 @@ def _card_height(event: dict) -> int:
 
     title_line_h = 40
     summary_line_h = 30
-    why_line_h = 25
     source_line_h = 16
 
-    height = 58 + 300 + 22
+    has_image = _has_real_image(event)
+
+    # Category header + spacing before text.
+    height = 58
+
+    # Only real photographs reserve image space.
+    if has_image:
+        height += 180 + 22
+    else:
+        height += 22
 
     height += max(1, len(title_lines)) * title_line_h
     height += 14
@@ -445,27 +456,31 @@ def _card_height(event: dict) -> int:
         height += len(summary_lines) * summary_line_h
         height += 18
 
-    if why_lines:
-        height += 23
-        height += len(why_lines) * why_line_h
-        height += 18
-
     if source_lines:
         height += 32
         height += len(source_lines) * source_line_h
         height += 20
 
-    return max(height, 470)
+    return max(height, 240)
 
 # =====================================================================
 # MOBILE EDITION
 # =====================================================================
 
-
 def render_mobile_edition(
     edition: dict,
     output_path: str | Path,
 ) -> Path:
+    """
+    Render one edition as a paginated mobile presentation.
+
+    The edition remains one editorial unit.  Pages are only a visual
+    presentation for mobile/Telegram.  A story is never split between
+    pages.
+
+    The first page is also written to the requested output_path for
+    backward compatibility with the existing edition renderer.
+    """
 
     if not isinstance(edition, dict):
         raise ValueError(
@@ -473,8 +488,9 @@ def render_mobile_edition(
         )
 
     output = Path(output_path)
+    mobile_root = output.parent
 
-    output.parent.mkdir(
+    mobile_root.mkdir(
         parents=True,
         exist_ok=True,
     )
@@ -484,815 +500,499 @@ def render_mobile_edition(
     header_height = 245
     footer_height = 150
 
-    card_heights = [
-        _card_height(event)
-        for event in events
-    ]
-
-    total_height = (
-        MARGIN
-        + header_height
-        + 10
-        + sum(card_heights)
-        + CARD_GAP * max(0, len(events) - 1)
-        + footer_height
-        + MARGIN
+    content_top = header_height + 10
+    content_bottom = (
+        MOBILE_PAGE_HEIGHT
+        - footer_height
+        - MARGIN
     )
 
-    total_height = max(total_height, 900)
+    available_first = content_bottom - content_top
 
-    canvas = Image.new(
-        "RGB",
-        (WIDTH, total_height),
-        WHITE,
-    )
+    # A page with no stories is still a valid mobile edition.
+    pages: list[list[dict]] = []
 
-    draw = ImageDraw.Draw(canvas)
+    current_page: list[dict] = []
+    current_height = 0
 
-    # ================================================================
-    # HEADER
-    # ================================================================
+    for event in events:
+        event_height = _card_height(event)
 
-    y = MARGIN
+        required = event_height
 
-    if LOGO_PATH.exists():
-        try:
-            with Image.open(LOGO_PATH) as source:
-                logo = ImageOps.contain(
-                    source.convert("RGB"),
-                    (120, 120),
-                    Image.Resampling.LANCZOS,
-                )
+        if current_page:
+            required += CARD_GAP
 
-                canvas.paste(
-                    logo,
-                    (MARGIN, y),
-                )
-        except Exception:
-            pass
+        if (
+            current_page
+            and current_height + required > available_first
+        ):
+            pages.append(current_page)
+            current_page = []
+            current_height = 0
+            required = event_height
 
-    brand_x = MARGIN + 140
+        current_page.append(event)
+        current_height += required
 
-    draw.text(
-        (brand_x, y + 8),
-        "AROUND",
-        font=_font(42, bold=True),
-        fill=BLACK,
-    )
+    if current_page:
+        pages.append(current_page)
 
-    draw.text(
-        (brand_x, y + 52),
-        "THE MAIN",
-        font=_font(42, bold=True),
-        fill=RED,
-    )
+    if not pages:
+        pages = [[]]
 
-    draw.text(
-        (brand_x, y + 103),
-        "GLOBAL NEWS",
-        font=_font(17, bold=True),
-        fill=BLACK,
-    )
+    page_files: list[Path] = []
 
-    edition_label = _edition_label(edition)
+    def draw_header(
+        canvas: Image.Image,
+        draw: ImageDraw.ImageDraw,
+        page_number: int,
+    ) -> None:
+        y = MARGIN
 
-    draw.text(
-        (MARGIN, y + 142),
-        edition_label,
-        font=_font(18, bold=True),
-        fill=RED,
-    )
+        if LOGO_PATH.exists():
+            try:
+                with Image.open(LOGO_PATH) as source:
+                    logo = ImageOps.contain(
+                        source.convert("RGB"),
+                        (120, 120),
+                        Image.Resampling.LANCZOS,
+                    )
 
-    date_text = _format_date(
-        _edition_date(edition)
-    )
+                    canvas.paste(
+                        logo,
+                        (MARGIN, y),
+                    )
+            except Exception:
+                pass
 
-    if date_text:
+        brand_x = MARGIN + 140
+
         draw.text(
-            (MARGIN, y + 169),
-            date_text,
-            font=_font(15, bold=True),
-            fill=BLACK,
-        )
-
-    draw.line(
-        (
-            MARGIN,
-            header_height - 18,
-            WIDTH - MARGIN,
-            header_height - 18,
-        ),
-        fill=BLACK,
-        width=5,
-    )
-
-    y = header_height + 10
-
-    # ================================================================
-    # NEWS CARDS
-    # ================================================================
-
-    for index, event in enumerate(events):
-
-        card_height = card_heights[index]
-
-        card_top = y
-        card_bottom = y + card_height
-
-        draw.rectangle(
-            (
-                MARGIN,
-                card_top,
-                WIDTH - MARGIN,
-                card_bottom,
-            ),
-            outline=BLACK,
-            width=2,
-        )
-
-        # Category header.
-        category = _event_category(event)
-
-        draw.rectangle(
-            (
-                MARGIN,
-                card_top,
-                WIDTH - MARGIN,
-                card_top + 42,
-            ),
+            (brand_x, y + 8),
+            "AROUND",
+            font=_font(42, bold=True),
             fill=BLACK,
         )
 
         draw.text(
-            (
-                MARGIN + 16,
-                card_top + 9,
-            ),
-            category,
-            font=_font(16, bold=True),
-            fill=WHITE,
+            (brand_x, y + 52),
+            "THE MAIN",
+            font=_font(42, bold=True),
+            fill=RED,
         )
 
-        # Story number, not category number.
-        number_text = f"{index + 1:02d}"
+        draw.text(
+            (brand_x, y + 103),
+            "GLOBAL NEWS",
+            font=_font(17, bold=True),
+            fill=BLACK,
+        )
+
+        edition_label = _edition_label(edition)
+
+        draw.text(
+            (MARGIN, y + 142),
+            edition_label,
+            font=_font(18, bold=True),
+            fill=RED,
+        )
+
+        date_text = _format_date(
+            _edition_date(edition)
+        )
+
+        if date_text:
+            draw.text(
+                (MARGIN, y + 169),
+                date_text,
+                font=_font(15, bold=True),
+                fill=BLACK,
+            )
+
+        page_text = f"PAGE {page_number:02d}"
 
         bbox = draw.textbbox(
             (0, 0),
-            number_text,
-            font=_font(16, bold=True),
+            page_text,
+            font=_font(15, bold=True),
         )
 
         draw.text(
             (
                 WIDTH
                 - MARGIN
-                - 16
                 - (bbox[2] - bbox[0]),
-                card_top + 9,
-            ),
-            number_text,
-            font=_font(16, bold=True),
-            fill=RED,
-        )
-
-        # Image.
-        image_top = card_top + 58
-        image_height = 255
-
-        image = _load_image(
-            event,
-            WIDTH - MARGIN * 2 - 32,
-            image_height,
-        )
-
-        canvas.paste(
-            image,
-            (
-                MARGIN + 16,
-                image_top,
-            ),
-        )
-
-        text_x = MARGIN + 16
-        text_width = WIDTH - MARGIN * 2 - 32
-
-        title_y = image_top + image_height + 22
-
-        title_end = _draw_wrapped(
-            draw,
-            _title(event),
-            text_x,
-            title_y,
-            _font(29, bold=True),
-            BLACK,
-            text_width,
-            max_lines=4,
-            spacing=5,
-        )
-
-        current_y = title_end + 12
-
-        # Summary.
-        summary = _summary(event)
-
-        if summary:
-            summary_end = _draw_wrapped(
-                draw,
-                summary,
-                text_x,
-                current_y,
-                _font(18),
-                GRAY,
-                text_width,
-                max_lines=5,
-                spacing=5,
-            )
-
-            current_y = summary_end + 18
-
-        # Why it matters.
-        why = _why_it_matters(event)
-
-        if why:
-            why_top = current_y
-
-            draw.rectangle(
-                (
-                    text_x,
-                    why_top,
-                    text_x + 5,
-                    why_top + 66,
-                ),
-                fill=RED,
-            )
-
-            draw.text(
-                (
-                    text_x + 14,
-                    why_top,
-                ),
-                "WHY IT MATTERS",
-                font=_font(13, bold=True),
-                fill=RED,
-            )
-
-            why_end = _draw_wrapped(
-                draw,
-                why,
-                text_x + 14,
-                why_top + 23,
-                _font(16),
-                BLACK,
-                text_width - 14,
-                max_lines=3,
-                spacing=4,
-            )
-
-            current_y = why_end + 18
-
-        # Sources are positioned AFTER all content.
-        sources = _sources(event)
-
-        if sources:
-            sources_y = current_y
-
-            draw.text(
-                (
-                    text_x,
-                    sources_y,
-                ),
-                "SOURCES",
-                font=_font(11, bold=True),
-                fill=RED,
-            )
-
-            source_text = "  •  ".join(
-                sources[:3]
-            )
-
-            _draw_wrapped(
-                draw,
-                source_text,
-                text_x + 70,
-                sources_y - 2,
-                _font(10),
-                GRAY,
-                text_width - 70,
-                max_lines=2,
-                spacing=2,
-            )
-
-        # The calculated card height guarantees that the next card
-        # starts after the current card's actual content area.
-        y = card_bottom + CARD_GAP
-
-    # ================================================================
-    # FOOTER
-    # ================================================================
-
-    footer_top = total_height - footer_height
-
-    draw.line(
-        (
-            MARGIN,
-            footer_top,
-            WIDTH - MARGIN,
-            footer_top,
-        ),
-        fill=BLACK,
-        width=3,
-    )
-
-    draw.text(
-        (
-            MARGIN,
-            footer_top + 22,
-        ),
-        "DAILY BRIEF",
-        font=_font(18, bold=True),
-        fill=RED,
-    )
-
-    draw.text(
-        (
-            MARGIN,
-            footer_top + 53,
-        ),
-        "The most important stories, delivered in brief.",
-        font=_font(14),
-        fill=BLACK,
-    )
-
-    draw.text(
-        (
-            MARGIN,
-            footer_top + 79,
-        ),
-        "Three times daily  •  7:00  |  13:00  |  20:00",
-        font=_font(12, bold=True),
-        fill=GRAY,
-    )
-
-    draw.text(
-        (
-            MARGIN,
-            footer_top + 111,
-        ),
-        f"🎧  {TELEGRAM_HANDLE}",
-        font=_font(13, bold=True),
-        fill=BLACK,
-    )
-
-    draw.rectangle(
-        (
-            0,
-            total_height - 24,
-            WIDTH,
-            total_height,
-        ),
-        fill=RED,
-    )
-
-    tagline = "STAY INFORMED. STAY AHEAD."
-
-    bbox = draw.textbbox(
-        (0, 0),
-        tagline,
-        font=_font(13, bold=True),
-    )
-
-    draw.text(
-        (
-            (WIDTH - (bbox[2] - bbox[0])) / 2,
-            total_height - 21,
-        ),
-        tagline,
-        font=_font(13, bold=True),
-        fill=WHITE,
-    )
-
-    canvas.save(
-        output,
-        format="PNG",
-        optimize=True,
-    )
-
-    return output
-
-
-    if not isinstance(edition, dict):
-        raise ValueError(
-            "edition must be a dictionary"
-        )
-
-    output = Path(output_path)
-
-    output.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    events = _collect_events(edition)
-
-    card_heights = [
-        _card_height(event)
-        for event in events
-    ]
-
-    header_height = 245
-
-    footer_height = 150
-
-    total_height = (
-        header_height
-        + footer_height
-        + sum(card_heights)
-        + CARD_GAP * max(0, len(events) - 1)
-        + MARGIN * 2
-    )
-
-    total_height = max(
-        total_height,
-        900,
-    )
-
-    canvas = Image.new(
-        "RGB",
-        (WIDTH, total_height),
-        WHITE,
-    )
-
-    draw = ImageDraw.Draw(canvas)
-
-    # ================================================================
-    # HEADER
-    # ================================================================
-
-    y = MARGIN
-
-    if LOGO_PATH.exists():
-        try:
-            with Image.open(LOGO_PATH) as source:
-                logo = ImageOps.contain(
-                    source.convert("RGB"),
-                    (120, 120),
-                    Image.Resampling.LANCZOS,
-                )
-
-                canvas.paste(
-                    logo,
-                    (MARGIN, y),
-                )
-        except Exception:
-            pass
-
-    brand_x = MARGIN + 140
-
-    draw.text(
-        (brand_x, y + 8),
-        "AROUND",
-        font=_font(42, bold=True),
-        fill=BLACK,
-    )
-
-    draw.text(
-        (brand_x, y + 52),
-        "THE MAIN",
-        font=_font(42, bold=True),
-        fill=RED,
-    )
-
-    draw.text(
-        (brand_x, y + 103),
-        "GLOBAL NEWS",
-        font=_font(17, bold=True),
-        fill=BLACK,
-    )
-
-    edition_label = _edition_label(
-        edition
-    )
-
-    draw.text(
-        (MARGIN, y + 142),
-        edition_label,
-        font=_font(18, bold=True),
-        fill=RED,
-    )
-
-    date_text = _format_date(
-        _edition_date(edition)
-    )
-
-    if date_text:
-        draw.text(
-            (
-                MARGIN,
                 y + 169,
             ),
-            date_text,
+            page_text,
             font=_font(15, bold=True),
             fill=BLACK,
         )
 
-    draw.line(
-        (
-            MARGIN,
-            header_height - 18,
-            WIDTH - MARGIN,
-            header_height - 18,
-        ),
-        fill=BLACK,
-        width=5,
-    )
-
-    y = header_height + 10
-
-    # ================================================================
-    # NEWS CARDS
-    # ================================================================
-
-    for index, event in enumerate(events):
-
-        card_height = card_heights[index]
-
-        card_top = y
-        card_bottom = y + card_height
-
-        # Card frame.
-        draw.rectangle(
+        draw.line(
             (
                 MARGIN,
-                card_top,
+                header_height - 18,
                 WIDTH - MARGIN,
-                card_bottom,
+                header_height - 18,
             ),
-            outline=BLACK,
-            width=2,
+            fill=BLACK,
+            width=5,
         )
 
-        # Category strip.
-        category = _event_category(event)
+    def draw_footer(
+        canvas: Image.Image,
+        draw: ImageDraw.ImageDraw,
+    ) -> None:
+        footer_top = MOBILE_PAGE_HEIGHT - footer_height
 
-        draw.rectangle(
+        draw.line(
             (
                 MARGIN,
-                card_top,
+                footer_top,
                 WIDTH - MARGIN,
-                card_top + 42,
+                footer_top,
             ),
+            fill=BLACK,
+            width=3,
+        )
+
+        draw.text(
+            (
+                MARGIN,
+                footer_top + 22,
+            ),
+            "DAILY BRIEF",
+            font=_font(18, bold=True),
+            fill=RED,
+        )
+
+        draw.text(
+            (
+                MARGIN,
+                footer_top + 53,
+            ),
+            "The most important stories, delivered in brief.",
+            font=_font(14),
             fill=BLACK,
         )
 
         draw.text(
             (
-                MARGIN + 16,
-                card_top + 9,
+                MARGIN,
+                footer_top + 79,
             ),
-            category,
-            font=_font(16, bold=True),
-            fill=WHITE,
+            "GLOBAL NEWS • AROUND THE MAIN",
+            font=_font(12, bold=True),
+            fill=GRAY,
         )
 
-        # Number.
-        number_text = f"{index + 1:02d}"
+        social_y = footer_top + 108
+        social_font = _font(13, bold=True)
+
+        telegram_text = f"🎧 TELEGRAM {TELEGRAM_HANDLE}"
+
+        draw.text(
+            (
+                MARGIN,
+                social_y,
+            ),
+            telegram_text,
+            font=social_font,
+            fill=BLACK,
+        )
+
+        telegram_width = draw.textbbox(
+            (0, 0),
+            telegram_text,
+            font=social_font,
+        )[2]
+
+        separator_x = MARGIN + telegram_width + 24
+
+        draw.text(
+            (
+                separator_x,
+                social_y,
+            ),
+            "|",
+            font=social_font,
+            fill=GRAY,
+        )
+
+        x_logo_x = separator_x + 28
+        x_logo_y = social_y + 1
+        x_logo_size = 16
+
+        if X_LOGO_PATH.exists():
+            try:
+                with Image.open(X_LOGO_PATH) as source:
+                    x_logo = ImageOps.contain(
+                        source.convert("RGBA"),
+                        (x_logo_size, x_logo_size),
+                        Image.Resampling.LANCZOS,
+                    )
+
+                    canvas.paste(
+                        x_logo,
+                        (x_logo_x, x_logo_y),
+                        x_logo,
+                    )
+            except Exception:
+                pass
+
+        draw.text(
+            (
+                x_logo_x + x_logo_size + 8,
+                social_y,
+            ),
+            X_HANDLE,
+            font=social_font,
+            fill=BLACK,
+        )
+
+        draw.rectangle(
+            (
+                0,
+                MOBILE_PAGE_HEIGHT - 24,
+                WIDTH,
+                MOBILE_PAGE_HEIGHT,
+            ),
+            fill=RED,
+        )
+
+        tagline = "STAY INFORMED. STAY AHEAD."
 
         bbox = draw.textbbox(
             (0, 0),
-            number_text,
-            font=_font(16, bold=True),
+            tagline,
+            font=_font(13, bold=True),
         )
 
         draw.text(
             (
-                WIDTH
-                - MARGIN
-                - 16
-                - (bbox[2] - bbox[0]),
-                card_top + 9,
+                (WIDTH - (bbox[2] - bbox[0])) / 2,
+                MOBILE_PAGE_HEIGHT - 21,
             ),
-            number_text,
-            font=_font(16, bold=True),
-            fill=RED,
+            tagline,
+            font=_font(13, bold=True),
+            fill=WHITE,
         )
 
-        # Image.
-        image_top = card_top + 58
-        image_height = 300
-
-        image = _load_image(
-            event,
-            WIDTH - MARGIN * 2 - 32,
-            image_height,
+    for page_number, page_events in enumerate(
+        pages,
+        start=1,
+    ):
+        page_path = (
+            mobile_root
+            / f"page-{page_number:02d}.png"
         )
 
-        canvas.paste(
-            image,
+        canvas = Image.new(
+            "RGB",
             (
-                MARGIN + 16,
-                image_top,
+                WIDTH,
+                MOBILE_PAGE_HEIGHT,
             ),
+            WHITE,
         )
 
-        text_x = MARGIN + 16
-        text_width = WIDTH - MARGIN * 2 - 32
+        draw = ImageDraw.Draw(canvas)
 
-        title_y = image_top + image_height + 22
-
-        # Headline.
-        title_end = _draw_wrapped(
+        draw_header(
+            canvas,
             draw,
-            _title(event),
-            text_x,
-            title_y,
-            _font(29, bold=True),
-            BLACK,
-            text_width,
-            max_lines=4,
-            spacing=5,
+            page_number,
         )
 
-        # Summary.
-        summary = _summary(event)
+        y = content_top
 
-        if summary:
-            summary_y = title_end + 12
+        for index, event in enumerate(page_events):
+            card_height = _card_height(event)
 
-            summary_end = _draw_wrapped(
-                draw,
-                summary,
-                text_x,
-                summary_y,
-                _font(17),
-                GRAY,
-                text_width,
-                max_lines=5,
-                spacing=5,
-            )
-        else:
-            summary_end = title_end
-
-        # Why it matters.
-        why = _why_it_matters(event)
-
-        if why:
-            why_top = summary_end + 18
+            card_top = y
+            card_bottom = y + card_height
 
             draw.rectangle(
                 (
-                    text_x,
-                    why_top,
-                    text_x + 5,
-                    why_top + 66,
+                    MARGIN,
+                    card_top,
+                    WIDTH - MARGIN,
+                    card_bottom,
                 ),
-                fill=RED,
+                outline=BLACK,
+                width=2,
+            )
+
+            category = _event_category(event)
+
+            draw.rectangle(
+                (
+                    MARGIN,
+                    card_top,
+                    WIDTH - MARGIN,
+                    card_top + 42,
+                ),
+                fill=BLACK,
             )
 
             draw.text(
                 (
-                    text_x + 14,
-                    why_top,
+                    MARGIN + 16,
+                    card_top + 9,
                 ),
-                "WHY IT MATTERS",
-                font=_font(13, bold=True),
+                category,
+                font=_font(16, bold=True),
+                fill=WHITE,
+            )
+
+            # Global story number.
+            story_number = sum(
+                len(previous_page)
+                for previous_page in pages[: page_number - 1]
+            ) + index + 1
+
+            number_text = f"{story_number:02d}"
+
+            bbox = draw.textbbox(
+                (0, 0),
+                number_text,
+                font=_font(16, bold=True),
+            )
+
+            draw.text(
+                (
+                    WIDTH
+                    - MARGIN
+                    - 16
+                    - (bbox[2] - bbox[0]),
+                    card_top + 9,
+                ),
+                number_text,
+                font=_font(16, bold=True),
                 fill=RED,
             )
 
-            _draw_wrapped(
+            text_x = MARGIN + 16
+            text_width = WIDTH - MARGIN * 2 - 32
+
+            has_image = _has_real_image(event)
+
+            if has_image:
+                image_top = card_top + 58
+                image_height = 180
+
+                image = _load_image(
+                    event,
+                    text_width,
+                    image_height,
+                )
+
+                canvas.paste(
+                    image,
+                    (
+                        text_x,
+                        image_top,
+                    ),
+                )
+
+                title_y = (
+                    image_top
+                    + image_height
+                    + 22
+                )
+            else:
+                title_y = card_top + 80
+
+            title_end = _draw_wrapped(
                 draw,
-                why,
-                text_x + 14,
-                why_top + 23,
-                _font(15),
+                _title(event),
+                text_x,
+                title_y,
+                _font(29, bold=True),
                 BLACK,
-                text_width - 14,
-                max_lines=3,
-                spacing=4,
+                text_width,
+                max_lines=4,
+                spacing=5,
             )
 
-        # Sources.
-        sources = _sources(event)
+            current_y = title_end + 12
 
-        if sources:
-            sources_y = card_bottom - 58
+            summary = _summary(event)
 
-            draw.text(
-                (
+            if summary:
+                summary_end = _draw_wrapped(
+                    draw,
+                    summary,
                     text_x,
-                    sources_y,
-                ),
-                "SOURCES",
-                font=_font(11, bold=True),
-                fill=RED,
-            )
+                    current_y,
+                    _font(18),
+                    GRAY,
+                    text_width,
+                    max_lines=5,
+                    spacing=5,
+                )
 
-            source_text = "  •  ".join(
-                sources[:3]
-            )
+                current_y = summary_end + 18
 
-            _draw_wrapped(
-                draw,
-                source_text,
-                text_x + 70,
-                sources_y - 2,
-                _font(10),
-                GRAY,
-                text_width - 70,
-                max_lines=2,
-                spacing=2,
-            )
+            sources = _sources(event)
 
-        y = card_bottom + CARD_GAP
+            if sources:
+                sources_y = current_y
 
-    # ================================================================
-    # FOOTER
-    # ================================================================
+                draw.text(
+                    (
+                        text_x,
+                        sources_y,
+                    ),
+                    "SOURCES",
+                    font=_font(11, bold=True),
+                    fill=RED,
+                )
 
-    footer_top = total_height - footer_height
+                source_text = "  •  ".join(
+                    sources[:3]
+                )
 
-    draw.line(
-        (
-            MARGIN,
-            footer_top,
-            WIDTH - MARGIN,
-            footer_top,
-        ),
-        fill=BLACK,
-        width=3,
-    )
+                _draw_wrapped(
+                    draw,
+                    source_text,
+                    text_x + 70,
+                    sources_y - 2,
+                    _font(10),
+                    GRAY,
+                    text_width - 70,
+                    max_lines=2,
+                    spacing=2,
+                )
 
-    draw.text(
-        (
-            MARGIN,
-            footer_top + 22,
-        ),
-        "DAILY BRIEF",
-        font=_font(18, bold=True),
-        fill=RED,
-    )
+            y = card_bottom + CARD_GAP
 
-    draw.text(
-        (
-            MARGIN,
-            footer_top + 53,
-        ),
-        "The most important stories, delivered in brief.",
-        font=_font(14),
-        fill=BLACK,
-    )
+        draw_footer(
+            canvas,
+            draw,
+        )
 
-    draw.text(
-        (
-            MARGIN,
-            footer_top + 79,
-        ),
-        "Three times daily  •  7:00  |  13:00  |  20:00",
-        font=_font(12, bold=True),
-        fill=GRAY,
-    )
+        canvas.save(
+            page_path,
+            format="PNG",
+            optimize=True,
+        )
 
-    draw.text(
-        (
-            MARGIN,
-            footer_top + 111,
-        ),
-        f"🎧  {TELEGRAM_HANDLE}",
-        font=_font(13, bold=True),
-        fill=BLACK,
-    )
+        page_files.append(page_path)
 
-    draw.rectangle(
-        (
-            0,
-            total_height - 24,
-            WIDTH,
-            total_height,
-        ),
-        fill=RED,
-    )
+    # Keep the normal paginated files and also provide the
+    # requested legacy mobile.png as a copy of PAGE 01.
+    first_page = page_files[0]
 
-    tagline = "STAY INFORMED. STAY AHEAD."
+    if output != first_page:
+        if output.exists():
+            output.unlink()
 
-    bbox = draw.textbbox(
-        (0, 0),
-        tagline,
-        font=_font(13, bold=True),
-    )
+        first_page.replace(output)
 
-    draw.text(
-        (
-            (WIDTH - (bbox[2] - bbox[0])) / 2,
-            total_height - 21,
-        ),
-        tagline,
-        font=_font(13, bold=True),
-        fill=WHITE,
-    )
-
-    canvas.save(
-        output,
-        format="PNG",
-        optimize=True,
-    )
+        # Restore PAGE 01 so the paginated set remains complete.
+        first_page.write_bytes(output.read_bytes())
 
     return output
