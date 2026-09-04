@@ -427,7 +427,7 @@ def _card_height(event: dict) -> int:
     if _has_real_image(event):
         return 300
 
-    return 250
+    return 200
 
 
 def render_mobile_edition(
@@ -467,7 +467,7 @@ def render_mobile_edition(
     # PAGES 02+: compact header.
     # Keep enough space for the full header, edition/date/page row,
     # and divider before the first story.
-    content_top_first = header_height + 35
+    content_top_first = header_height - 61
     content_top_other = MARGIN + 50
 
     content_bottom = (
@@ -1197,7 +1197,7 @@ def render_mobile_edition(
                     MARGIN,
                     card_top,
                     WIDTH - MARGIN,
-                    card_top + 42,
+                    card_top + 35,
                 ),
                 fill=BLACK,
             )
@@ -1268,14 +1268,14 @@ def render_mobile_edition(
                     + 22
                 )
             else:
-                title_y = card_top + 80
+                title_y = card_top + 45
 
             title_end = _draw_wrapped(
                 draw,
                 _title(event),
                 text_x,
                 title_y,
-                _font(29, bold=True),
+                _font(30, bold=True),
                 BLACK,
                 text_width,
                 max_lines=4,
@@ -1299,7 +1299,7 @@ def render_mobile_edition(
                     spacing=5,
                 )
 
-                current_y = summary_end + 18
+                current_y = summary_end + 15
 
             sources = _sources(event)
 
