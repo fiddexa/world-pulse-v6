@@ -461,7 +461,7 @@ def render_mobile_edition(
     events = _collect_events(edition)
 
     header_height = 285
-    footer_height = 150
+    footer_height = 300
 
     # PAGE 01: full branded header + edition information.
     # PAGES 02+: compact header.
@@ -755,392 +755,37 @@ def render_mobile_edition(
         draw: ImageDraw.ImageDraw,
         page_number: int,
     ) -> None:
-        footer_top = MOBILE_PAGE_HEIGHT - footer_height
+        footer_path = Path("assets/footer.png")
 
-        # =============================================================
-        # PAGE 01 — COMPACT BRANDED FOOTER
-        # =============================================================
-        if page_number == 1:
-            # -------------------------------------------------------------
-            # FOOTER LAYOUT
-            #
-            # LEFT:
-            #   DAILY BRIEF
-            #
-            # CENTER:
-            #   SUPPORT THE CHANNEL
-            #
-            # RIGHT:
-            #   QR CODE
-            #
-            # BOTTOM:
-            #   TELEGRAM + X
-            #
-            # The common red tagline below remains unchanged.
-            # -------------------------------------------------------------
+        if not footer_path.exists():
+            return
 
-            footer_top = MOBILE_PAGE_HEIGHT - footer_height
+        try:
+            with Image.open(footer_path) as source:
+                footer = source.convert("RGB")
 
-            # Top border
-            draw.line(
+            footer = ImageOps.contain(
+                footer,
                 (
-                    MARGIN,
-                    footer_top,
-                    WIDTH - MARGIN,
-                    footer_top,
+                    WIDTH - MARGIN * 2,
+                    footer_height,
                 ),
-                fill=BLACK,
-                width=1,
+                Image.Resampling.LANCZOS,
             )
 
-            # -------------------------------------------------------------
-            # 1. LEFT COLUMN — DAILY BRIEF
-            # -------------------------------------------------------------
-            left_x = MARGIN
-            title_y = footer_top + 16
+            footer_x = (WIDTH - footer.width) // 2
+            footer_y = MOBILE_PAGE_HEIGHT - footer.height
 
-            draw.text(
-                (left_x, title_y),
-                "DAILY BRIEF",
-                font=_font(17, bold=True),
-                fill=RED,
-            )
-
-            draw.text(
-                (left_x, title_y + 21),
-                "The most important stories, delivered in brief.",
-                font=_font(11),
-                fill=BLACK,
-            )
-
-            draw.text(
-                (left_x, title_y + 40),
-                "GLOBAL NEWS • AROUND THE MAIN",
-                font=_font(10, bold=True),
-                fill=GRAY,
-            )
-
-            # -------------------------------------------------------------
-            # 2. CENTER COLUMN — SUPPORT THE CHANNEL
-            # -------------------------------------------------------------
-            divider_x = int(WIDTH * 0.40)
-
-            draw.line(
+            canvas.paste(
+                footer,
                 (
-                    divider_x,
-                    footer_top + 14,
-                    divider_x,
-                    footer_top + 72,
+                    footer_x,
+                    footer_y,
                 ),
-                fill="#CCCCCC",
-                width=1,
             )
 
-            support_x = divider_x + 15
-
-            draw.text(
-                (support_x, title_y),
-                "SUPPORT THE CHANNEL",
-                font=_font(15, bold=True),
-                fill=RED,
-            )
-
-            draw.text(
-                (support_x, title_y + 21),
-                "Support AROUND THE MAIN with a coffee ☕",
-                font=_font(11),
-                fill=BLACK,
-            )
-
-            draw.text(
-                (support_x, title_y + 40),
-                "buymeacoffee.com/aroundthemain",
-                font=_font(10),
-                fill=GRAY,
-            )
-
-            # -------------------------------------------------------------
-            # 3. RIGHT COLUMN — QR CODE
-            # -------------------------------------------------------------
-            #
-            # QR is intentionally large, but its bottom is kept above
-            # the common red tagline so it is never hidden by the bar.
-            #
-            qr_path = Path("assets/support-qr.png")
-
-            red_bar_height = 24
-            red_bar_top = MOBILE_PAGE_HEIGHT - red_bar_height
-
-            qr_size = min(
-                130,
-                footer_height - 4,
-            )
-
-            qr_x = WIDTH - MARGIN - qr_size
-
-            # Align QR with the upper part of the footer.
-            # Prevent it from entering the red bottom bar.
-            qr_y = footer_top + 2
-
-            max_qr_y = red_bar_top - qr_size
-            if qr_y > max_qr_y:
-                qr_y = max_qr_y
-
-            if qr_path.exists():
-                try:
-                    with Image.open(qr_path) as source:
-                        qr = source.convert("RGBA").resize(
-                            (qr_size, qr_size),
-                            Image.Resampling.LANCZOS,
-                        )
-
-                    canvas.paste(
-                        qr,
-                        (qr_x, qr_y),
-                        qr,
-                    )
-                except Exception:
-                    pass
-
-            # -------------------------------------------------------------
-            # 4. SOCIAL ROW
-            # -------------------------------------------------------------
-            social_y = footer_top + 88
-            social_font = _font(11, bold=True)
-
-            telegram_text = f"TELEGRAM {TELEGRAM_HANDLE}"
-
-            draw.text(
-                (MARGIN, social_y),
-                telegram_text,
-                font=social_font,
-                fill=BLACK,
-            )
-
-            telegram_width = draw.textbbox(
-                (0, 0),
-                telegram_text,
-                font=social_font,
-            )[2]
-
-            separator_x = MARGIN + telegram_width + 12
-
-            draw.text(
-                (separator_x, social_y),
-                "|",
-                font=social_font,
-                fill=GRAY,
-            )
-
-            x_logo_x = separator_x + 18
-            x_logo_y = social_y + 1
-            x_logo_size = 14
-
-            if X_LOGO_PATH.exists():
-                try:
-                    with Image.open(X_LOGO_PATH) as source:
-                        x_logo = source.convert("RGBA").resize(
-                            (x_logo_size, x_logo_size),
-                            Image.Resampling.LANCZOS,
-                        )
-
-                    canvas.paste(
-                        x_logo,
-                        (x_logo_x, x_logo_y),
-                        x_logo,
-                    )
-
-                    draw.text(
-                        (
-                            x_logo_x + x_logo_size + 5,
-                            social_y,
-                        ),
-                        X_HANDLE,
-                        font=social_font,
-                        fill=BLACK,
-                    )
-
-                except Exception:
-                    draw.text(
-                        (x_logo_x, social_y),
-                        f"X {X_HANDLE}",
-                        font=social_font,
-                        fill=BLACK,
-                    )
-            else:
-                draw.text(
-                    (x_logo_x, social_y),
-                    f"X {X_HANDLE}",
-                    font=social_font,
-                    fill=BLACK,
-                )
-
-        else:
-            footer_top = MOBILE_PAGE_HEIGHT - footer_height
-
-            draw.line(
-                (
-                    MARGIN,
-                    footer_top,
-                    WIDTH - MARGIN,
-                    footer_top,
-                ),
-                fill=BLACK,
-                width=3,
-            )
-
-            draw.text(
-                (
-                    MARGIN,
-                    footer_top + 22,
-                ),
-                "DAILY BRIEF",
-                font=_font(18, bold=True),
-                fill=RED,
-            )
-
-            draw.text(
-                (
-                    MARGIN,
-                    footer_top + 53,
-                ),
-                "The most important stories, delivered in brief.",
-                font=_font(14),
-                fill=BLACK,
-            )
-
-            draw.text(
-                (
-                    MARGIN,
-                    footer_top + 79,
-                ),
-                "GLOBAL NEWS • AROUND THE MAIN",
-                font=_font(12, bold=True),
-                fill=GRAY,
-            )
-
-            social_y = footer_top + 108
-            social_font = _font(13, bold=True)
-
-            telegram_text = f"🎧 TELEGRAM {TELEGRAM_HANDLE}"
-
-            draw.text(
-                (
-                    MARGIN,
-                    social_y,
-                ),
-                telegram_text,
-                font=social_font,
-                fill=BLACK,
-            )
-
-            telegram_width = draw.textbbox(
-                (0, 0),
-                telegram_text,
-                font=social_font,
-            )[2]
-
-            separator_x = MARGIN + telegram_width + 24
-
-            draw.text(
-                (
-                    separator_x,
-                    social_y,
-                ),
-                "|",
-                font=social_font,
-                fill=GRAY,
-            )
-
-            x_logo_x = separator_x + 28
-            x_logo_y = social_y + 1
-            x_logo_size = 16
-
-            if X_LOGO_PATH.exists():
-                try:
-                    with Image.open(X_LOGO_PATH) as source:
-                        x_logo = ImageOps.contain(
-                            source.convert("RGBA"),
-                            (x_logo_size, x_logo_size),
-                            Image.Resampling.LANCZOS,
-                        )
-
-                        canvas.paste(
-                            x_logo,
-                            (x_logo_x, x_logo_y),
-                            x_logo,
-                        )
-                except Exception:
-                    pass
-
-            draw.text(
-                (
-                    x_logo_x + x_logo_size + 8,
-                    social_y,
-                ),
-                X_HANDLE,
-                font=social_font,
-                fill=BLACK,
-            )
-
-            draw.rectangle(
-                (
-                    0,
-                    MOBILE_PAGE_HEIGHT - 24,
-                    WIDTH,
-                    MOBILE_PAGE_HEIGHT,
-                ),
-                fill=RED,
-            )
-
-            tagline = "STAY INFORMED. STAY AHEAD."
-
-            bbox = draw.textbbox(
-                (0, 0),
-                tagline,
-                font=_font(13, bold=True),
-            )
-
-            draw.text(
-                (
-                    (WIDTH - (bbox[2] - bbox[0])) / 2,
-                    MOBILE_PAGE_HEIGHT - 21,
-                ),
-                tagline,
-                font=_font(13, bold=True),
-                fill=WHITE,
-            )
-
-        # =============================================================
-        # COMMON BOTTOM RED TAGLINE
-        # =============================================================
-        draw.rectangle(
-            (
-                0,
-                MOBILE_PAGE_HEIGHT - 24,
-                WIDTH,
-                MOBILE_PAGE_HEIGHT,
-            ),
-            fill=RED,
-        )
-
-        tagline = "STAY INFORMED. STAY AHEAD."
-
-        bbox = draw.textbbox(
-            (0, 0),
-            tagline,
-            font=_font(10, bold=True),
-        )
-
-        draw.text(
-            (
-                (WIDTH - (bbox[2] - bbox[0])) / 2,
-                MOBILE_PAGE_HEIGHT - 18,
-            ),
-            tagline,
-            font=_font(10, bold=True),
-            fill=WHITE,
-        )
+        except Exception:
+            pass
 
     for page_number, page_events in enumerate(
         pages,
