@@ -534,7 +534,7 @@ def render_mobile_edition(
                         header,
                         (
                             WIDTH,
-                            285,
+                            235,
                         ),
                         method=Image.Resampling.LANCZOS,
                         centering=(0.5, 0.5),
@@ -545,6 +545,30 @@ def render_mobile_edition(
                         (0, 0),
                     )
 
+                    # MORNING BRIEFING — placed in the open space
+                    # between the interrupted top lines of the header.
+                    briefing = "MORNING BRIEFING"
+
+                    briefing_bbox = draw.textbbox(
+                        (0, 0),
+                        briefing,
+                        font=_font(13, bold=True),
+                    )
+
+                    briefing_width = (
+                        briefing_bbox[2] - briefing_bbox[0]
+                    )
+
+                    draw.text(
+                        (
+                            WIDTH - briefing_width - 109,
+                            32,
+                        ),
+                        briefing,
+                        font=_font(13, bold=True),
+                        fill=BLACK,
+                    )
+
                 except Exception:
                     pass
 
@@ -552,7 +576,7 @@ def render_mobile_edition(
             # EDITION / DATE / MORNING BRIEFING / PAGE
             # ---------------------------------------------------------
 
-            info_y = 300
+            info_y = 191
 
             edition_label = _edition_label(edition)
             edition_date = _format_date(
@@ -577,14 +601,14 @@ def render_mobile_edition(
                 font=_font(13, bold=True),
             )[2]
 
-            divider_1 = MARGIN + edition_width + 12
+            divider_1 = MARGIN + edition_width + 13
 
             draw.line(
                 (
                     divider_1,
                     info_y + 1,
                     divider_1,
-                    info_y + 20,
+                    info_y + 15,
                 ),
                 fill=GRAY,
                 width=1,
@@ -594,11 +618,7 @@ def render_mobile_edition(
 
             date_text = edition_date.upper()
 
-            if edition_name:
-                date_text += f"  •  {edition_name}"
-            else:
-                date_text += "  •  MORNING BRIEFING"
-
+            
             draw.text(
                 (
                     date_x,
