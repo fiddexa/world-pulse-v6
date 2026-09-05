@@ -136,6 +136,9 @@ def approve_edition_preview(
         encoding="utf-8",
     )
 
+    manifest["manifest_path"] = str(manifest_path)
+    manifest["preview_root"] = str(root)
+
     return manifest
 
 
@@ -180,5 +183,8 @@ def reject_edition_preview(
         ),
         encoding="utf-8",
     )
+
+    manifest["manifest_path"] = str(manifest_path)
+    manifest["preview_root"] = str(root)
 
     return manifest

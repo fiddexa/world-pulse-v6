@@ -454,123 +454,52 @@ def _direct_casualty_bonus(event: dict) -> float:
 
     return 5.0
 
-def _momentum_score(event: dict, now: datetime | None = None) -> float:
-    """
-    Estimate story momentum from recent update activity.
-
-    A continuing event with multiple recent reports should outrank
-    an old static story with the same underlying impact.
-    """
-
-    dates = _published_dates(event)
-
-    if not dates:
-        return 20.0
-
-    if now is None:
-        now = datetime.now(timezone.utc)
-
-    if now.tzinfo is None:
-        now = now.replace(tzinfo=timezone.utc)
-
-    recent_count = 0
-
-    for dt in dates:
-        age_hours = max(
-            0.0,
-            (now - dt).total_seconds() / 3600.0,
-        )
-
-        if age_hours <= 24:
-            recent_count += 1
-
-    latest_freshness = freshness_score(event, now)
-
-    if recent_count >= 4:
-        return 100.0
-
-    if recent_count == 3:
-        return 85.0
-
-    if recent_count == 2:
-        return 70.0
-
-    if recent_count == 1:
-        return max(45.0, latest_freshness * 0.70)
-
-    return 20.0
-
-
-def _international_reach_score(event: dict) -> float:
-    intelligence = event.get("intelligence")
-
-    if isinstance(intelligence, dict):
-        value = intelligence.get("international_reach_score")
-        if value is not None:
-            return max(0.0, min(100.0, _safe_number(value)))
-
-    return min(
-        100.0,
-        _scope_score(event) * 0.75
-        + len(
-            {
-                str(x).strip().lower()
-                for x in event.get("locations", [])
-                if x
-            }
-        ) * 5.0,
-    )
-
-
 def editorial_score(
     event: Any,
     now: datetime | None = None,
 ) -> float:
     """
-    Reader-oriented editorial priority.
+    Calculate editorial priority from 0 to 100.
 
-    Factors:
-    - global impact
-    - freshness
-    - momentum
-    - international reach
-    - source confidence
-    - editorial significance
+    Intelligence is the primary editorial signal.
+    Verification affects confidence.
+    Freshness provides a recency signal.
+    Reporting breadth provides supporting evidence.
+    Direct humanitarian scale receives an additional bonus.
     """
 
     if not isinstance(event, dict):
         return 0.0
 
-    impact = _intelligence_score(event)
+    intelligence = _intelligence_score(event)
     verification = _verification_score(event)
     freshness = freshness_score(event, now)
-    momentum = _momentum_score(event, now)
-    reach = _international_reach_score(event)
+    scope = _scope_score(event)
 
-    editorial_bonus = _editorial_impact_bonus(event)
-    humanitarian_scale_bonus = _direct_humanitarian_scale_bonus(event)
+    humanitarian_scale_bonus = _direct_humanitarian_scale_bonus(
+        event
+    )
+
     casualty_bonus = _direct_casualty_bonus(event)
 
-    significance = min(
-        100.0,
-        20.0
-        + editorial_bonus * 3.0
-        + casualty_bonus * 2.0
-        + _scope_score(event) * 0.50,
-    )
-
     score = (
-        impact * 0.35
+        intelligence * 0.40
+        + verification * 0.15
         + freshness * 0.25
-        + momentum * 0.10
-        + reach * 0.10
-        + verification * 0.10
-        + significance * 0.10
+        + scope * 0.15
+        + humanitarian_scale_bonus
+        + casualty_bonus
     )
 
-    # Keep very old stories from dominating the current edition.
+    # Serious events retain editorial weight even when reporting
+    # breadth is limited.
+    if intelligence >= 45.0:
+        score += 5.0
+
+    # Strongly penalize stale stories so an old event does not
+    # remain the lead merely because its original impact was high.
     if freshness <= 10.0:
-        score -= 5.0
+        score -= 8.0
 
     return round(
         max(0.0, min(100.0, score)),
@@ -647,14 +576,6 @@ def rank_event(
         ),
         "scope_score": round(
             _scope_score(event),
-            2,
-        ),
-        "momentum_score": round(
-            _momentum_score(event, now),
-            2,
-        ),
-        "international_reach_score": round(
-            _international_reach_score(event),
             2,
         ),
         "breaking": is_breaking(event, now),

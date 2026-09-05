@@ -6,9 +6,6 @@ import re
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import qrcode
-import hashlib
-from urllib.parse import urlparse
-from urllib.request import Request, urlopen
 
 
 # =====================================================================
@@ -95,19 +92,6 @@ def _title(event: dict) -> str:
         if value:
             return value
 
-    content = event.get("content")
-
-    if isinstance(content, dict):
-        for key in (
-            "headline",
-            "title",
-            "publication_title",
-            "display_title",
-        ):
-            value = _safe_text(content.get(key))
-            if value:
-                return value
-
     return "Untitled story"
 
 
@@ -121,20 +105,6 @@ def _summary(event: dict) -> str:
         value = _safe_text(event.get(key))
         if value:
             return value
-
-    content = event.get("content")
-
-    if isinstance(content, dict):
-        for key in (
-            "summary",
-            "what_happened",
-            "publication_summary",
-            "description",
-            "dek",
-        ):
-            value = _safe_text(content.get(key))
-            if value:
-                return value
 
     return ""
 
@@ -151,56 +121,30 @@ def _why_it_matters(event: dict) -> str:
 
 
 def _sources(event: dict) -> list[str]:
-    def clean_sources(value) -> list[str]:
-        if isinstance(value, list):
-            result = []
+    value = event.get("sources")
 
-            for item in value:
-                if isinstance(item, str):
-                    text = item.strip()
-                elif isinstance(item, dict):
-                    text = (
-                        _safe_text(item.get("name"))
-                        or _safe_text(item.get("title"))
-                        or _safe_text(item.get("url"))
-                    )
-                else:
-                    text = _safe_text(item)
+    if isinstance(value, list):
+        result = []
 
-                if text and text not in result:
-                    result.append(text)
+        for item in value:
+            if isinstance(item, str):
+                text = item.strip()
+            elif isinstance(item, dict):
+                text = (
+                    _safe_text(item.get("name"))
+                    or _safe_text(item.get("title"))
+                    or _safe_text(item.get("url"))
+                )
+            else:
+                text = _safe_text(item)
 
-            return result
+            if text:
+                result.append(text)
 
-        if isinstance(value, str) and value.strip():
-            return [value.strip()]
+        return result
 
-        return []
-
-    value = clean_sources(event.get("sources"))
-
-    if value:
-        return value
-
-    content = event.get("content")
-
-    if isinstance(content, dict):
-        value = clean_sources(
-            content.get("sources")
-        )
-
-        if value:
-            return value
-
-    verification = event.get("verification")
-
-    if isinstance(verification, dict):
-        value = clean_sources(
-            verification.get("sources")
-        )
-
-        if value:
-            return value
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
 
     return []
 
@@ -222,89 +166,7 @@ def _image_path(event: dict) -> Path | None:
         if path.exists() and path.is_file():
             return path
 
-    content = event.get("content")
-
-    image_url = event.get("image_url")
-
-    if not image_url and isinstance(content, dict):
-        image_url = content.get("image_url")
-
-    if not image_url:
-        for article in _list(event.get("articles")):
-            if isinstance(article, dict):
-                image_url = article.get("image_url")
-                if image_url:
-                    break
-
-    if not image_url:
-        return None
-
-    image_url = _safe_text(image_url)
-
-    try:
-        parsed = urlparse(image_url)
-
-        if parsed.scheme not in {"http", "https"}:
-            return None
-
-        hostname = (parsed.hostname or "").lower()
-
-        # Only allow the trusted UN media host for automatic
-        # production image caching.
-        if not hostname.endswith("unitednations.entermediadb.net"):
-            return None
-
-        cache_dir = Path("data/images")
-        cache_dir.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        extension = ".jpg"
-
-        path_name = Path(parsed.path).name.lower()
-
-        for candidate in (".jpg", ".jpeg", ".png", ".webp"):
-            if candidate in path_name:
-                extension = candidate
-                break
-
-        digest = hashlib.sha256(
-            image_url.encode("utf-8")
-        ).hexdigest()[:20]
-
-        local_path = cache_dir / f"{digest}{extension}"
-
-        if local_path.exists() and local_path.stat().st_size > 0:
-            return local_path
-
-        request = Request(
-            image_url,
-            headers={
-                "User-Agent": "AroundTheMain/1.0",
-                "Accept": "image/avif,image/webp,image/jpeg,image/png,*/*",
-            },
-        )
-
-        with urlopen(
-            request,
-            timeout=15,
-        ) as response:
-            data = response.read()
-
-        if not data:
-            return None
-
-        local_path.write_bytes(data)
-
-        # Validate that the downloaded file is a real image.
-        with Image.open(local_path) as check:
-            check.verify()
-
-        return local_path
-
-    except Exception:
-        return None
+    return None
 
 
 def _has_real_image(event: dict) -> bool:
@@ -537,33 +399,6 @@ def _collect_events(edition: dict) -> list[dict]:
 
 
 def _event_category(event: dict) -> str:
-    content = event.get("content")
-
-    if isinstance(content, dict):
-        value = _safe_text(
-            content.get("section")
-        )
-
-        if value:
-            aliases = {
-                "world": "WORLD",
-                "geopolitics": "GEOPOLITICS",
-                "business": "BUSINESS",
-                "energy": "ENERGY",
-                "technology": "TECHNOLOGY",
-                "science_health": "SCIENCE & HEALTH",
-                "climate": "CLIMATE",
-                "trade_logistics": "TRADE & LOGISTICS",
-                "society": "SOCIETY",
-                "culture": "CULTURE",
-                "sports": "SPORTS",
-            }
-
-            return aliases.get(
-                value.strip().lower(),
-                value.upper(),
-            )
-
     for key in (
         "category",
         "section",
@@ -584,100 +419,16 @@ def _event_category(event: dict) -> str:
 
 def _card_height(event: dict) -> int:
     """
-    Calculate card height from the actual rendered content.
+    Compact mobile newspaper card height.
 
-    The same wrapping limits used by the renderer are respected, so
-    title, summary and source text remain inside the card boundary.
+    The card must remain compact while leaving enough room
+    for title, summary and sources inside the border.
     """
 
-    if not isinstance(event, dict):
-        return 200
-
-    probe = Image.new("RGB", (WIDTH, MOBILE_PAGE_HEIGHT), NEWSPAPER)
-    probe_draw = ImageDraw.Draw(probe)
-
-    text_width = WIDTH - MARGIN * 2 - 32
-
-    title_font = _font(30, bold=True)
-    summary_font = _font(18)
-    source_font = _font(10)
-
-    title_lines = _wrap(
-        probe_draw,
-        _title(event),
-        title_font,
-        text_width,
-    )[:4]
-
-    title_line_height = (
-        title_font.getbbox("Ag")[3]
-        - title_font.getbbox("Ag")[1]
-        + 5
-    )
-
-    summary = _summary(event)
-    summary_lines = []
-
-    if summary:
-        summary_lines = _wrap(
-            probe_draw,
-            summary,
-            summary_font,
-            text_width,
-        )[:5]
-
-    summary_line_height = (
-        summary_font.getbbox("Ag")[3]
-        - summary_font.getbbox("Ag")[1]
-        + 5
-    )
-
-    sources = _sources(event)
-    source_lines = []
-
-    if sources:
-        source_text = "  •  ".join(sources[:3])
-
-        source_lines = _wrap(
-            probe_draw,
-            source_text,
-            source_font,
-            max(1, text_width - 70),
-        )[:2]
-
-    source_line_height = (
-        source_font.getbbox("Ag")[3]
-        - source_font.getbbox("Ag")[1]
-        + 2
-    )
-
-    height = 45
-
     if _has_real_image(event):
-        height += 180 + 22
+        return 300
 
-    if title_lines:
-        height += (
-            len(title_lines) * title_line_height
-            + 12
-        )
-
-    if summary_lines:
-        height += (
-            len(summary_lines) * summary_line_height
-            + 15
-        )
-
-    if source_lines:
-        height += max(
-            18,
-            len(source_lines) * source_line_height,
-        ) + 10
-
-    # Keep compact cards for short stories, but never allow the
-    # rendered content to exceed the border.
-    return max(200, min(520, height))
-
+    return 200
 
 
 def render_mobile_edition(
@@ -743,15 +494,9 @@ def render_mobile_edition(
         if current_page:
             required += CARD_GAP
 
-        available = (
-            available_first
-            if not pages
-            else available_other
-        )
-
         if (
             current_page
-            and current_height + required > available
+            and current_height + required > available_first
         ):
             pages.append(current_page)
             current_page = []
@@ -1067,31 +812,28 @@ def render_mobile_edition(
 
             # ---------------------------------------------------------
             # WORKING QR CODE — BUY ME A COFFEE
-            # PAGE 1 ONLY
             # ---------------------------------------------------------
-            if page_number == 1:
+            qr = qrcode.make(
+                "https://buymeacoffee.com/aroundthemain"
+            ).convert("RGB")
 
-                qr = qrcode.make(
-                    "https://buymeacoffee.com/aroundthemain"
-                ).convert("RGB")
+            qr_size = 133
 
-                qr_size = 133
+            qr = qr.resize(
+                (qr_size, qr_size),
+                Image.Resampling.NEAREST,
+            )
 
-                qr = qr.resize(
-                    (qr_size, qr_size),
-                    Image.Resampling.NEAREST,
-                )
+            qr_x = WIDTH - MARGIN - qr_size + 17
+            qr_y = footer_top + 11
 
-                qr_x = WIDTH - MARGIN - qr_size + 17
-                qr_y = footer_top + 11
-
-                canvas.paste(
-                    qr,
-                    (
-                        qr_x,
-                        qr_y,
-                    ),
-                )
+            canvas.paste(
+                qr,
+                (
+                    qr_x,
+                    qr_y,
+                ),
+            )
 
         except Exception:
             pass
@@ -1103,8 +845,9 @@ def render_mobile_edition(
         y: int,
     ) -> None:
         """
-        Compact MARKETS TODAY panel.
-        Market snapshot for the test edition.
+        Compact MARKETS TODAY panel for the mobile edition.
+        Values are placeholders for now.
+        Live market data will be connected later.
         """
 
         # -------------------------------------------------------------
@@ -1131,13 +874,13 @@ def render_mobile_edition(
 
         draw.text(
             (MARGIN + 52, row1_y),
-            "S&P 500  7,747.71  +1.06%   |   NASDAQ  26,584.06  +1.40%   |   DOW  53,686.11  +1.18%",
-            font=_font(8),
+            "S&P 500  —  NASDAQ  —  DOW JONES",
+            font=_font(9),
             fill=GRAY,
         )
 
         # -------------------------------------------------------------
-        # ROW 2 — COMMODITIES
+        # ROW 2 — COMMODITIES / CURRENCY / LEADERS
         # -------------------------------------------------------------
         row2_y = y + 40
 
@@ -1150,8 +893,8 @@ def render_mobile_edition(
 
         draw.text(
             (MARGIN + 82, row2_y),
-            "BRENT  $95.69  +0.46%   |   GOLD  $4,520.40  +0.96%   |   WTI  $91.71  +1.01%",
-            font=_font(8),
+            "BRENT  —  GOLD  —  WTI",
+            font=_font(9),
             fill=GRAY,
         )
 
@@ -1169,8 +912,8 @@ def render_mobile_edition(
 
         draw.text(
             (MARGIN + 108, row3_y),
-            "EUR/USD  1.1627   |   DXY  99.12  +0.27%   |   USD/CNY  6.7113  -0.11%",
-            font=_font(8),
+            "EUR/USD  —  DXY  —  USD/CNY",
+            font=_font(9),
             fill=GRAY,
         )
 
@@ -1188,8 +931,8 @@ def render_mobile_edition(
 
         draw.text(
             (MARGIN + 91, row4_y),
-            "NVIDIA  +1.80%   |   APPLE  +1.00%   |   TESLA  +5.42%",
-            font=_font(8),
+            "NVIDIA  —  APPLE",
+            font=_font(9),
             fill=GRAY,
         )
 
@@ -1362,44 +1105,23 @@ def render_mobile_edition(
                         text_x,
                         sources_y,
                     ),
-                    "SOURCE",
+                    "SOURCES",
                     font=_font(11, bold=True),
                     fill=RED,
                 )
 
-                normalized_sources = []
-
-                for source in sources[:3]:
-                    value = _safe_text(source)
-
-                    source_aliases = {
-                        "un": "UN News",
-                        "un news": "UN News",
-                        "united nations": "United Nations",
-                        "who": "WHO",
-                        "unicef": "UNICEF",
-                    }
-
-                    value = source_aliases.get(
-                        value.lower(),
-                        value,
-                    )
-
-                    if value and value not in normalized_sources:
-                        normalized_sources.append(value)
-
                 source_text = "  •  ".join(
-                    normalized_sources
+                    sources[:3]
                 )
 
                 _draw_wrapped(
                     draw,
                     source_text,
-                    text_x + 55,
+                    text_x + 70,
                     sources_y - 2,
-                    _font(11),
+                    _font(10),
                     GRAY,
-                    text_width - 55,
+                    text_width - 70,
                     max_lines=2,
                     spacing=2,
                 )
@@ -1407,7 +1129,7 @@ def render_mobile_edition(
             y = card_bottom + CARD_GAP
 
         # -------------------------------------------------------------
-        # PAGE 01 — MARKETS TODAY + FULL FOOTER
+        # MARKETS TODAY — ABOVE FOOTER
         # -------------------------------------------------------------
 
         if page_number == 1:
@@ -1426,11 +1148,11 @@ def render_mobile_edition(
                 page_number,
             )
 
-        # -------------------------------------------------------------
-        # PAGES 2+ — ONLY BOTTOM RED STRIPE
-        # -------------------------------------------------------------
-
         else:
+
+            # ---------------------------------------------------------
+            # PAGES 2+ — ONLY BOTTOM RED STRIPE
+            # ---------------------------------------------------------
 
             red_bar_height = 28
 
