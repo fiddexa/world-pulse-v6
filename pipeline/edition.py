@@ -158,16 +158,42 @@ def _is_publishable(event: dict) -> bool:
     }
 
 
+def _decision(event: dict) -> str:
+    editorial = _editorial(event)
+
+    return str(
+        editorial.get(
+            "decision",
+            "",
+        )
+    ).strip().upper()
+
+
 def _sort_key(event: dict) -> tuple:
     role = _role(event)
+    decision = _decision(event)
 
     try:
         role_index = ROLE_ORDER.index(role)
     except ValueError:
         role_index = len(ROLE_ORDER)
 
+    decision_order = {
+        "FRONT_PAGE": 0,
+        "TOP_STORY": 1,
+        "IMPORTANT": 2,
+        "STANDARD": 3,
+        "IGNORE": 4,
+    }
+
+    decision_index = decision_order.get(
+        decision,
+        len(decision_order),
+    )
+
     return (
         role_index,
+        decision_index,
         -_score(event),
     )
 

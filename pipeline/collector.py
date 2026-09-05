@@ -74,6 +74,93 @@ def _items(root):
     return result
 
 
+def _media_image_url(item):
+    """
+    Extract a candidate image URL from common RSS/Atom media fields.
+
+    This only collects the URL. It does not imply image usage rights.
+    """
+
+    if item is None:
+        return ""
+
+    # RSS enclosure: <enclosure url="..." type="image/...">
+    for child in list(item):
+        name = _local_name(child.tag)
+
+        if name == "enclosure":
+            url = str(
+                child.attrib.get("url") or ""
+            ).strip()
+
+            content_type = str(
+                child.attrib.get("type") or ""
+            ).strip().lower()
+
+            if url and (
+                content_type.startswith("image/")
+                or re.search(
+                    r"\\.(?:jpg|jpeg|png|webp|gif)(?:$|[?#])",
+                    url,
+                    re.IGNORECASE,
+                )
+            ):
+                return url
+
+    # Media RSS: media:content / media:thumbnail
+    for element in item.iter():
+        name = _local_name(element.tag)
+
+        if name not in {
+            "content",
+            "thumbnail",
+        }:
+            continue
+
+        url = str(
+            element.attrib.get("url") or ""
+        ).strip()
+
+        if not url:
+            continue
+
+        content_type = str(
+            element.attrib.get("type") or ""
+        ).strip().lower()
+
+        if (
+            content_type.startswith("image/")
+            or re.search(
+                r"\\.(?:jpg|jpeg|png|webp|gif)(?:$|[?#])",
+                url,
+                re.IGNORECASE,
+            )
+        ):
+            return url
+
+    # Some feeds put the first image inside HTML content/description.
+    for child in list(item):
+        if _local_name(child.tag) not in {
+            "description",
+            "summary",
+            "content",
+        }:
+            continue
+
+        html = _text(child)
+
+        match = re.search(
+            r'<img[^>]+(?:src|data-src)=["\\\']([^"\\\']+)["\\\']',
+            html,
+            re.IGNORECASE,
+        )
+
+        if match:
+            return match.group(1).strip()
+
+    return ""
+
+
 def _extract_article(item, source, *, first_seen_at=None):
     title = _text(
         _child(item, {"title"})
@@ -113,12 +200,15 @@ def _extract_article(item, source, *, first_seen_at=None):
         _text(date_element)
     )
 
+    image_url = _media_image_url(item)
+
     result = {
         "title": title,
         "summary": summary,
         "source": source,
         "url": url,
         "published_at": published_at,
+        "image_url": image_url,
     }
 
     if first_seen_at is not None:

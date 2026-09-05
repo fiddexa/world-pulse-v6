@@ -213,19 +213,20 @@ def _is_major_humanitarian_event(event: Any) -> bool:
 
 def editorial_decision(event: Any) -> str:
     """
-    Reader-oriented editorial selection.
+    Return the recommended publication priority.
 
-    Current-edition relevance is more important than historical
-    impact alone. Fresh developments receive priority.
+    This layer decides editorial treatment, not truth.
     """
 
     if not isinstance(event, dict):
         return IGNORE
 
     score = _ranking_score(event)
+    intelligence = _intelligence_score(event)
+    verification = _verification_score(event)
     verification_level = _verification_level(event)
     breaking = _is_breaking(event)
-    intelligence = _intelligence_score(event)
+    article_count = _article_count(event)
 
     freshness = _safe_number(
         _ranking(event).get(
@@ -234,31 +235,52 @@ def editorial_decision(event: Any) -> str:
         )
     )
 
-    if score < 28.0:
+    if score < 25.0:
         return IGNORE
 
-    # Truly fresh, high-impact events can lead the edition.
     if (
-        score >= 45.0
-        and freshness >= 30.0
+        breaking
+        and intelligence >= 65.0
         and verification_level != "UNCONFIRMED"
     ):
         return FRONT_PAGE
 
-    # Strong current stories become secondary front-page stories.
+
     if (
-        score >= 40.0
+        _is_major_humanitarian_event(event)
         and freshness >= 30.0
+    ):
+        return FRONT_PAGE
+    if (
+        score >= 85.0
+        and verification_level in {
+            "MULTI_SOURCE",
+            "WIDELY_CONFIRMED",
+        }
+    ):
+        return FRONT_PAGE
+
+    if (
+        score >= 70.0
         and verification_level != "UNCONFIRMED"
     ):
         return TOP_STORY
 
-    # Older major stories remain useful, but cannot dominate
-    # the current edition.
-    if score >= 35.0:
+    if score >= 50.0:
         return IMPORTANT
 
+    if score >= 35.0:
+        return STANDARD
+
+    if (
+        intelligence >= 50.0
+        and article_count >= 1
+        and verification >= 20.0
+    ):
+        return STANDARD
+
     return IGNORE
+
 
 def editorial_role(
     event: Any,

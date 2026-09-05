@@ -44,7 +44,8 @@ from pipeline.source_connectors import (
     collect_from_connectors,
 )
 from pipeline.production_scheduler import run_scheduled_edition
-
+from pipeline.edition_runner import run_edition
+from pipeline.edition_counter import EditionCounter
 
 
 def collect_production_articles(*, timeout=15):
@@ -175,3 +176,90 @@ def run_production_job(
         event_memory=event_memory,
         language=language,
     )
+
+def run_test_production_job(
+    *,
+    publication_date,
+    edition_time,
+    timeout=20,
+    language="en",
+    event_memory=None,
+):
+    """
+    Manual production test.
+
+    The edition date and time are supplied explicitly.
+    No production slot resolver or automatic schedule is used.
+
+    This mode is intended for controlled testing before
+    automatic publication is enabled.
+    """
+
+    if not publication_date:
+        raise ValueError(
+            "publication_date is required"
+        )
+
+    if not edition_time:
+        raise ValueError(
+            "edition_time is required"
+        )
+
+    articles = collect_production_articles(
+        timeout=timeout,
+    )
+
+    print(
+        f"Collected production articles: {len(articles)}"
+    )
+
+    if event_memory is None:
+        event_memory = EventMemory()
+
+    edition = run_edition(
+        articles,
+        publication_date=publication_date,
+        edition_time=edition_time,
+        event_memory=event_memory,
+        edition_memory=None,
+        language=language,
+        exclude_ignored=True,
+    )
+
+    if not isinstance(edition, dict):
+        return {
+            "status": "FAILED",
+            "reason": "EDITION_NOT_CREATED",
+        }
+
+    edition_id = str(
+        edition.get("edition_id") or ""
+    ).strip()
+
+    edition_year = int(
+        str(publication_date)[:4]
+    )
+
+    counter = EditionCounter(
+        "data/edition_counter.json"
+    )
+
+    edition_number = counter.allocate(
+        edition_year,
+        edition_id,
+    )
+
+    edition["edition_year"] = edition_number.year
+    edition["edition_number"] = edition_number.number
+    edition["edition_label"] = edition_number.label
+
+    return {
+        "status": "COMPLETED",
+        "edition_id": edition_id,
+        "edition_year": edition_number.year,
+        "edition_number": edition_number.number,
+        "edition_label": edition_number.label,
+        "edition_date": str(publication_date),
+        "edition_time": str(edition_time),
+        "edition": edition,
+    }
