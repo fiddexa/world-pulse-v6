@@ -5,6 +5,7 @@ from typing import Any
 import re
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
+import qrcode
 
 
 # =====================================================================
@@ -18,8 +19,8 @@ X_HANDLE = "@aroundthemain"
 RED = (190, 0, 0)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
-GRAY = (105, 105, 105)
-LIGHT_GRAY = (225, 225, 225)
+GRAY = (50, 50, 50)
+LIGHT_GRAY = (200, 200, 200)
 NEWSPAPER = (243, 233, 216)
 
 WIDTH = 900
@@ -460,8 +461,8 @@ def render_mobile_edition(
 
     events = _collect_events(edition)
 
-    header_height = 285
-    footer_height = 300
+    header_height = 300
+    footer_height = 250
 
     # PAGE 01: full branded header + edition information.
     # PAGES 02+: compact header.
@@ -699,7 +700,7 @@ def render_mobile_edition(
                     info_y + 20,
                 ),
                 fill=GRAY,
-                width=1,
+                width=2,
             )
 
             date_x = divider_1 + 14
@@ -764,28 +765,153 @@ def render_mobile_edition(
             with Image.open(footer_path) as source:
                 footer = source.convert("RGB")
 
-            footer = ImageOps.contain(
+                
+            # Fit the prepared footer to the full mobile page width.
+            footer = ImageOps.fit(
                 footer,
                 (
-                    WIDTH - MARGIN * 2,
+                    WIDTH,
                     footer_height,
                 ),
-                Image.Resampling.LANCZOS,
+                method=Image.Resampling.LANCZOS,
+                centering=(0.5, 0.5),
             )
 
-            footer_x = (WIDTH - footer.width) // 2
-            footer_y = MOBILE_PAGE_HEIGHT - footer.height
+            footer_top = MOBILE_PAGE_HEIGHT - footer_height + 53
 
             canvas.paste(
                 footer,
                 (
-                    footer_x,
-                    footer_y,
+                    0,
+                    footer_top,
+                ),
+            )
+
+            # ---------------------------------------------------------
+            # WORKING QR CODE — BUY ME A COFFEE
+            # ---------------------------------------------------------
+            qr = qrcode.make(
+                "https://buymeacoffee.com/aroundthemain"
+            ).convert("RGB")
+
+            qr_size = 133
+
+            qr = qr.resize(
+                (qr_size, qr_size),
+                Image.Resampling.NEAREST,
+            )
+
+            qr_x = WIDTH - MARGIN - qr_size + 17
+            qr_y = footer_top + 11
+
+            canvas.paste(
+                qr,
+                (
+                    qr_x,
+                    qr_y,
                 ),
             )
 
         except Exception:
             pass
+
+
+    def draw_markets_today(
+        canvas: Image.Image,
+        draw: ImageDraw.ImageDraw,
+        y: int,
+    ) -> None:
+        """
+        Compact MARKETS TODAY panel for the mobile edition.
+        Values are placeholders for now.
+        Live market data will be connected later.
+        """
+
+        # -------------------------------------------------------------
+        # MARKETS TODAY — TITLE
+        # -------------------------------------------------------------
+        draw.text(
+            (MARGIN, y),
+            "MARKETS TODAY",
+            font=_font(13, bold=True),
+            fill=RED,
+        )
+
+        # -------------------------------------------------------------
+        # ROW 1 — INDEXES
+        # -------------------------------------------------------------
+        row1_y = y + 22
+
+        draw.text(
+            (MARGIN, row1_y),
+            "INDEXES",
+            font=_font(9, bold=True),
+            fill=BLACK,
+        )
+
+        draw.text(
+            (MARGIN + 52, row1_y),
+            "S&P 500  —  NASDAQ  —  DOW JONES",
+            font=_font(9),
+            fill=GRAY,
+        )
+
+        # -------------------------------------------------------------
+        # ROW 2 — COMMODITIES / CURRENCY / LEADERS
+        # -------------------------------------------------------------
+        row2_y = y + 40
+
+        draw.text(
+            (MARGIN, row2_y),
+            "COMMODITIES",
+            font=_font(9, bold=True),
+            fill=BLACK,
+        )
+
+        draw.text(
+            (MARGIN + 82, row2_y),
+            "BRENT  —  GOLD  —  WTI",
+            font=_font(9),
+            fill=GRAY,
+        )
+
+        # -------------------------------------------------------------
+        # ROW 3 — CURRENCY / GLOBAL
+        # -------------------------------------------------------------
+        row3_y = y + 58
+
+        draw.text(
+            (MARGIN, row3_y),
+            "CURRENCY / GLOBAL",
+            font=_font(9, bold=True),
+            fill=BLACK,
+        )
+
+        draw.text(
+            (MARGIN + 108, row3_y),
+            "EUR/USD  —  DXY  —  USD/CNY",
+            font=_font(9),
+            fill=GRAY,
+        )
+
+        # -------------------------------------------------------------
+        # ROW 4 — MARKET LEADERS
+        # -------------------------------------------------------------
+        row4_y = y + 76
+
+        draw.text(
+            (MARGIN, row4_y),
+            "MARKET LEADERS",
+            font=_font(9, bold=True),
+            fill=BLACK,
+        )
+
+        draw.text(
+            (MARGIN + 91, row4_y),
+            "NVIDIA  —  APPLE",
+            font=_font(9),
+            fill=GRAY,
+        )
 
     for page_number, page_events in enumerate(
         pages,
@@ -812,7 +938,7 @@ def render_mobile_edition(
             draw,
             page_number,
         )
-
+        
         if page_number == 1:
             y = content_top_first
         else:
@@ -978,6 +1104,17 @@ def render_mobile_edition(
                 )
 
             y = card_bottom + CARD_GAP
+
+        # -------------------------------------------------------------
+        # MARKETS TODAY — ABOVE FOOTER
+        # -------------------------------------------------------------
+        markets_y = MOBILE_PAGE_HEIGHT - footer_height - 43
+
+        draw_markets_today(
+            canvas,
+            draw,
+            markets_y,
+        )            
 
         draw_footer(
             canvas,
