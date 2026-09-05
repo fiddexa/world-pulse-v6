@@ -494,9 +494,15 @@ def render_mobile_edition(
         if current_page:
             required += CARD_GAP
 
+        available = (
+            available_first
+            if not pages
+            else available_other
+        )
+
         if (
             current_page
-            and current_height + required > available_first
+            and current_height + required > available
         ):
             pages.append(current_page)
             current_page = []
@@ -779,38 +785,64 @@ def render_mobile_edition(
 
             footer_top = MOBILE_PAGE_HEIGHT - footer_height + 53
 
-            canvas.paste(
-                footer,
-                (
-                    0,
-                    footer_top,
-                ),
-            )
+            # -------------------------------------------------------------
+            # FOOTER
+            # Page 1 = full footer
+            # Pages 2+ = red bottom strip only
+            # -------------------------------------------------------------
+
+            if page_number == 1:
+
+                canvas.paste(
+                    footer,
+                    (
+                        0,
+                        footer_top,
+                    ),
+                )
+
+            else:
+
+                # Red strip at the very bottom
+                red_strip_height = 30
+
+                draw.rectangle(
+                    (
+                         0,
+                        MOBILE_PAGE_HEIGHT - red_strip_height,
+                        WIDTH,
+                        MOBILE_PAGE_HEIGHT,
+                    ),
+                    fill=RED,
+                )
 
             # ---------------------------------------------------------
             # WORKING QR CODE — BUY ME A COFFEE
+            # PAGE 1 ONLY
             # ---------------------------------------------------------
-            qr = qrcode.make(
-                "https://buymeacoffee.com/aroundthemain"
-            ).convert("RGB")
+            if page_number == 1:
 
-            qr_size = 133
+                qr = qrcode.make(
+                    "https://buymeacoffee.com/aroundthemain"
+                ).convert("RGB")
 
-            qr = qr.resize(
-                (qr_size, qr_size),
-                Image.Resampling.NEAREST,
-            )
+                qr_size = 133
 
-            qr_x = WIDTH - MARGIN - qr_size + 17
-            qr_y = footer_top + 11
+                qr = qr.resize(
+                    (qr_size, qr_size),
+                    Image.Resampling.NEAREST,
+                )
 
-            canvas.paste(
-                qr,
-                (
-                    qr_x,
-                    qr_y,
-                ),
-            )
+                qr_x = WIDTH - MARGIN - qr_size + 17
+                qr_y = footer_top + 11
+
+                canvas.paste(
+                    qr,
+                    (
+                        qr_x,
+                        qr_y,
+                    ),
+                )
 
         except Exception:
             pass
@@ -1106,21 +1138,57 @@ def render_mobile_edition(
             y = card_bottom + CARD_GAP
 
         # -------------------------------------------------------------
-        # MARKETS TODAY — ABOVE FOOTER
+        # PAGE 01 — MARKETS TODAY + FULL FOOTER
         # -------------------------------------------------------------
-        markets_y = MOBILE_PAGE_HEIGHT - footer_height - 43
 
-        draw_markets_today(
-            canvas,
-            draw,
-            markets_y,
-        )            
+        if page_number == 1:
 
-        draw_footer(
-            canvas,
-            draw,
-            page_number,
-        )
+            markets_y = MOBILE_PAGE_HEIGHT - footer_height - 43
+
+            draw_markets_today(
+                canvas,
+                draw,
+                markets_y,
+            )
+
+            draw_footer(
+                canvas,
+                draw,
+                page_number,
+            )
+
+        # -------------------------------------------------------------
+        # PAGES 2+ — ONLY BOTTOM RED STRIPE
+        # -------------------------------------------------------------
+
+        else:
+
+            red_bar_height = 28
+
+            draw.rectangle(
+                (
+                    0,
+                    MOBILE_PAGE_HEIGHT - red_bar_height,
+                    WIDTH,
+                    MOBILE_PAGE_HEIGHT,
+                ),
+                fill=RED,
+            )
+
+            draw.text(
+                (
+                    WIDTH // 2,
+                    MOBILE_PAGE_HEIGHT - red_bar_height // 2,
+                ),
+                "Global News  |  Minimum text  |  Maximum meaning",
+                font=_font(11, bold=False),
+                fill=WHITE,
+                anchor="mm",
+            )
+
+        # -------------------------------------------------------------
+        # SAVE PAGE
+        # -------------------------------------------------------------
 
         canvas.save(
             page_path,
@@ -1128,7 +1196,7 @@ def render_mobile_edition(
             optimize=True,
         )
 
-        page_files.append(page_path)
+        page_files.append(page_path)       
 
     # Keep the normal paginated files and also provide the
     # requested legacy mobile.png as a copy of PAGE 01.
