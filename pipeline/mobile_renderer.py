@@ -537,103 +537,54 @@ def _collect_events(edition: dict) -> list[dict]:
 
 
 def _event_card_label(event: dict) -> str:
-    """Return a specific country/place/topic label for a news card."""
+    """Return the automatic editorial topic for a news card."""
 
     if not isinstance(event, dict):
         return "WORLD"
 
     content = event.get("content")
 
-    # Prefer explicit structured location/topic fields when available.
-    containers = [event]
+    # Use the automatically classified editorial section first.
     if isinstance(content, dict):
-        containers.append(content)
+        section = _safe_text(content.get("section"))
 
-    keys = (
-        "country",
-        "countries",
-        "location",
-        "locations",
-        "place",
-        "region",
-        "topic",
-    )
+        if section:
+            aliases = {
+                "world": "WORLD",
+                "geopolitics": "GEOPOLITICS",
+                "politics": "GEOPOLITICS",
+                "business": "BUSINESS",
+                "economy": "BUSINESS",
+                "economic": "BUSINESS",
+                "energy": "ENERGY",
+                "technology": "TECHNOLOGY",
+                "tech": "TECHNOLOGY",
+                "science": "SCIENCE & HEALTH",
+                "health": "SCIENCE & HEALTH",
+                "science_health": "SCIENCE & HEALTH",
+                "science & health": "SCIENCE & HEALTH",
+                "climate": "CLIMATE",
+                "environment": "CLIMATE",
+                "trade": "TRADE & LOGISTICS",
+                "logistics": "TRADE & LOGISTICS",
+                "trade_logistics": "TRADE & LOGISTICS",
+                "society": "SOCIETY",
+                "social": "SOCIETY",
+                "culture": "CULTURE",
+                "arts": "CULTURE",
+                "sports": "SPORTS",
+                "sport": "SPORTS",
+            }
 
-    for container in containers:
-        for key in keys:
-            value = container.get(key)
+            label = aliases.get(
+                section.strip().lower()
+            )
 
-            if isinstance(value, list):
-                for item in value:
-                    text = _safe_text(item)
-                    if text:
-                        return text.upper()[:24]
+            if label:
+                return label
 
-            else:
-                text = _safe_text(value)
-                if text:
-                    return text.upper()[:24]
-
-    # Fall back to recognizable locations in the headline.
-    title = _safe_text(
-        event.get("title")
-        or event.get("headline")
-        or (
-            content.get("title")
-            if isinstance(content, dict)
-            else ""
-        )
-        or (
-            content.get("headline")
-            if isinstance(content, dict)
-            else ""
-        )
-    )
-
-    location_keywords = (
-        "WEST BANK",
-        "PALESTINE",
-        "UKRAINE",
-        "RUSSIA",
-        "NEPAL",
-        "ISRAEL",
-        "IRAN",
-        "IRAQ",
-        "SYRIA",
-        "LEBANON",
-        "GAZA",
-        "EUROPE",
-        "CHINA",
-        "INDIA",
-        "PAKISTAN",
-        "AFGHANISTAN",
-        "UNITED STATES",
-        "USA",
-        "AMERICA",
-        "NORTH KOREA",
-        "SOUTH KOREA",
-        "JAPAN",
-        "TAIWAN",
-        "TURKEY",
-        "FRANCE",
-        "GERMANY",
-        "ITALY",
-        "SPAIN",
-        "BRITAIN",
-        "UK",
-        "AFRICA",
-        "ASIA",
-    )
-
-    title_upper = title.upper()
-
-    for keyword in location_keywords:
-        if keyword in title_upper:
-            return keyword
-
-    # Existing section is the final fallback.
+    # Final fallback to the existing section/category logic.
     return _event_category(event)
-
 
 def _event_category(event: dict) -> str:
     """Return a concise location/topic label for the story card."""
