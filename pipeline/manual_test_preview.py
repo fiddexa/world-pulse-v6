@@ -29,10 +29,14 @@ def main():
 
     print("Test time:", now.isoformat())
 
+    test_memory = EditionMemory(
+        db_path="data/manual_test_edition_memory.sqlite3"
+    )
+
     result = run_scheduled_edition(
         articles,
         now,
-        edition_memory=EditionMemory(),
+        edition_memory=test_memory,
         event_memory=EventMemory(),
     )
 

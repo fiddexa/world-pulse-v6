@@ -112,24 +112,208 @@ def _why_it_matters(event):
 
 
 def _section(event):
+    """
+    Determine the primary editorial section for an event.
+
+    Priority:
+    1. Explicit editorial section, when it matches a supported section.
+    2. Deterministic content-based classification.
+    3. WORLD fallback.
+
+    A country/location is never used as the section.
+    """
+
+    allowed = {
+        "world": "world",
+        "geopolitics": "geopolitics",
+        "business": "business",
+        "energy": "energy",
+        "technology": "technology",
+        "science_health": "science_health",
+        "climate": "climate",
+        "trade_logistics": "trade_logistics",
+        "society": "society",
+        "culture": "culture",
+        "sports": "sports",
+    }
+
+    aliases = {
+        "world": "world",
+        "geopolitics": "geopolitics",
+        "politics": "geopolitics",
+        "business": "business",
+        "economy": "business",
+        "economic": "business",
+        "energy": "energy",
+        "technology": "technology",
+        "tech": "technology",
+        "science": "science_health",
+        "health": "science_health",
+        "science_health": "science_health",
+        "science & health": "science_health",
+        "climate": "climate",
+        "environment": "climate",
+        "trade": "trade_logistics",
+        "logistics": "trade_logistics",
+        "trade_logistics": "trade_logistics",
+        "society": "society",
+        "social": "society",
+        "culture": "culture",
+        "arts": "culture",
+        "sports": "sports",
+        "sport": "sports",
+    }
+
     editorial = event.get("editorial")
 
     if isinstance(editorial, dict):
-        section = _first_nonempty(editorial.get("section"))
+        value = _first_nonempty(
+            editorial.get("section")
+        )
 
-        if section:
-            return section
+        if value:
+            normalized = aliases.get(
+                value.strip().lower()
+            )
 
-    categories = []
+            # Trust explicit editorial categories,
+            # but let generic WORLD be classified from content.
+            if normalized in allowed.values() and normalized != "world":
+                return normalized
+
+    parts = []
+
+    def add_text(value):
+        value = _first_nonempty(value)
+
+        if value:
+            parts.append(value)
+
+    add_text(event.get("title"))
+    add_text(event.get("headline"))
+    add_text(event.get("summary"))
+    add_text(event.get("description"))
+    add_text(event.get("why_it_matters"))
 
     for article in _articles(event):
-        category = _first_nonempty(article.get("category"))
+        if not isinstance(article, dict):
+            continue
 
-        if category and category not in categories:
-            categories.append(category)
+        add_text(article.get("title"))
+        add_text(article.get("headline"))
+        add_text(article.get("summary"))
+        add_text(article.get("description"))
+        add_text(article.get("content"))
 
-    if categories:
-        return categories[0]
+    text = " ".join(parts).lower()
+
+    rules = {
+        "climate": (
+            "climate", "climate change", "global warming",
+            "flood", "flooding", "wildfire", "wildfires",
+            "drought", "hurricane", "cyclone", "storm",
+            "earthquake", "tsunami", "volcanic",
+            "extreme weather", "heatwave", "heat wave",
+            "environment", "emissions", "carbon",
+            "greenhouse gas", "deforestation",
+        ),
+
+        "energy": (
+            "oil", "crude", "petroleum", "gas", "natural gas",
+            "lng", "lpg", "opec", "opec+", "refinery",
+            "refinery", "fuel", "diesel", "gasoline",
+            "jet fuel", "electricity", "power grid",
+            "energy", "solar power", "wind power",
+            "nuclear power",
+        ),
+
+        "technology": (
+            "technology", "tech", "artificial intelligence",
+            "ai model", "ai", "software", "semiconductor",
+            "chip", "chips", "computer", "cyber",
+            "cybersecurity", "robot", "robotics",
+            "smartphone", "internet", "data center",
+            "space technology",
+        ),
+
+        "sports": (
+            "football", "soccer", "basketball", "tennis",
+            "cricket", "rugby", "baseball", "hockey",
+            "olympics", "olympic", "championship",
+            "tournament", "league", "athlete", "athletes",
+            "match", "world cup", "grand slam",
+        ),
+
+        "culture": (
+            "film", "movie", "cinema", "music", "concert",
+            "museum", "theatre", "theater", "art",
+            "artist", "culture", "cultural", "festival",
+            "book", "literature", "actor", "actress",
+        ),
+
+        "science_health": (
+            "health", "medical", "medicine", "hospital",
+            "doctor", "disease", "virus", "vaccine",
+            "vaccination", "pandemic", "epidemic",
+            "who ", "unicef", "cancer", "clinical trial",
+            "research", "scientists", "science", "study",
+            "drug", "healthcare",
+        ),
+
+        "trade_logistics": (
+            "trade", "trading", "export", "exports",
+            "import", "imports", "tariff", "tariffs",
+            "customs", "shipping", "shipment",
+            "logistics", "port", "ports", "cargo",
+            "freight", "supply chain", "supply chains",
+            "trade agreement", "trade deal",
+        ),
+
+        "business": (
+            "business", "company", "companies", "corporate",
+            "corporation", "market", "markets", "stock",
+            "stocks", "shares", "investor", "investors",
+            "investment", "bank", "banking", "finance",
+            "financial", "economy", "economic", "gdp",
+            "inflation", "interest rate", "earnings",
+            "profit", "merger", "acquisition",
+        ),
+
+        "society": (
+            "election", "elections", "government", "protest",
+            "protests", "demonstration", "demonstrations",
+            "society", "social", "population", "migration",
+            "migrant", "refugee", "refugees", "education",
+            "school", "schools", "crime", "police",
+            "workers", "labor", "labour",
+        ),
+
+        "geopolitics": (
+            "war", "conflict", "military", "army",
+            "troops", "missile", "missiles", "nato",
+            "sanctions", "diplomatic", "diplomacy",
+            "president", "prime minister", "foreign minister",
+            "summit", "peace talks", "ceasefire",
+            "iran", "israel", "ukraine", "russia",
+            "china", "united states", "north korea",
+        ),
+    }
+
+    scores = {
+        section: sum(
+            1 for keyword in keywords
+            if keyword in text
+        )
+        for section, keywords in rules.items()
+    }
+
+    best_section = max(
+        scores,
+        key=scores.get,
+    )
+
+    if scores[best_section] > 0:
+        return best_section
 
     return "world"
 
