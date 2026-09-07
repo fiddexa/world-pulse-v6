@@ -536,9 +536,136 @@ def _collect_events(edition: dict) -> list[dict]:
     return result
 
 
-def _event_category(event: dict) -> str:
+def _event_card_label(event: dict) -> str:
+    """Return a specific country/place/topic label for a news card."""
+
+    if not isinstance(event, dict):
+        return "WORLD"
+
     content = event.get("content")
 
+    # Prefer explicit structured location/topic fields when available.
+    containers = [event]
+    if isinstance(content, dict):
+        containers.append(content)
+
+    keys = (
+        "country",
+        "countries",
+        "location",
+        "locations",
+        "place",
+        "region",
+        "topic",
+    )
+
+    for container in containers:
+        for key in keys:
+            value = container.get(key)
+
+            if isinstance(value, list):
+                for item in value:
+                    text = _safe_text(item)
+                    if text:
+                        return text.upper()[:24]
+
+            else:
+                text = _safe_text(value)
+                if text:
+                    return text.upper()[:24]
+
+    # Fall back to recognizable locations in the headline.
+    title = _safe_text(
+        event.get("title")
+        or event.get("headline")
+        or (
+            content.get("title")
+            if isinstance(content, dict)
+            else ""
+        )
+        or (
+            content.get("headline")
+            if isinstance(content, dict)
+            else ""
+        )
+    )
+
+    location_keywords = (
+        "WEST BANK",
+        "PALESTINE",
+        "UKRAINE",
+        "RUSSIA",
+        "NEPAL",
+        "ISRAEL",
+        "IRAN",
+        "IRAQ",
+        "SYRIA",
+        "LEBANON",
+        "GAZA",
+        "EUROPE",
+        "CHINA",
+        "INDIA",
+        "PAKISTAN",
+        "AFGHANISTAN",
+        "UNITED STATES",
+        "USA",
+        "AMERICA",
+        "NORTH KOREA",
+        "SOUTH KOREA",
+        "JAPAN",
+        "TAIWAN",
+        "TURKEY",
+        "FRANCE",
+        "GERMANY",
+        "ITALY",
+        "SPAIN",
+        "BRITAIN",
+        "UK",
+        "AFRICA",
+        "ASIA",
+    )
+
+    title_upper = title.upper()
+
+    for keyword in location_keywords:
+        if keyword in title_upper:
+            return keyword
+
+    # Existing section is the final fallback.
+    return _event_category(event)
+
+
+def _event_category(event: dict) -> str:
+    """Return a concise location/topic label for the story card."""
+
+    if not isinstance(event, dict):
+        return "WORLD"
+
+    # Prefer explicit location fields when available.
+    location_keys = (
+        "country",
+        "country_name",
+        "location",
+        "place",
+        "city",
+        "region",
+    )
+
+    for key in location_keys:
+        value = _safe_text(event.get(key))
+        if value:
+            return value.upper()[:24]
+
+    # Some editions keep location metadata inside content.
+    content = event.get("content")
+
+    if isinstance(content, dict):
+        for key in location_keys:
+            value = _safe_text(content.get(key))
+            if value:
+                return value.upper()[:24]
+
+    # Preserve the existing section-based fallback.
     if isinstance(content, dict):
         value = _safe_text(
             content.get("section")
@@ -587,7 +714,7 @@ def _card_height(
     *,
     compact: bool = False,
 ) -> int:
-    """Calculate the rendered height of a news card."""
+    """Calculate the rendered height of a split-layout news card."""
 
     if not isinstance(event, dict):
         return 180 if compact else 230
@@ -599,24 +726,24 @@ def _card_height(
     )
     probe_draw = ImageDraw.Draw(probe)
 
-    text_width = WIDTH - MARGIN * 2 - 32
+    # Card is split into text (left) and image (right).
+    # Keep a comfortable text column while giving the image real visual weight.
+    card_inner_width = WIDTH - MARGIN * 2 - 32
+    image_width = 330
+    text_width = card_inner_width - image_width - 24
 
     if compact:
         title_font = _font(20, bold=True)
         summary_font = _font(13)
-        source_font = _font(9)
         title_max_lines = 2
         summary_max_lines = 2
-        image_height = 65
         min_height = 175
     else:
         title_font = _font(30, bold=True)
         summary_font = _font(18)
-        source_font = _font(10)
-        title_max_lines = 4
+        title_max_lines = 5
         summary_max_lines = 5
-        image_height = 180
-        min_height = 230
+        min_height = 320
 
     title_lines = _wrap(
         probe_draw,
@@ -628,7 +755,7 @@ def _card_height(
     title_line_height = (
         title_font.getbbox("Ag")[3]
         - title_font.getbbox("Ag")[1]
-        + 4
+        + (4 if compact else 5)
     )
 
     summary = _summary(event)
@@ -645,7 +772,7 @@ def _card_height(
     summary_line_height = (
         summary_font.getbbox("Ag")[3]
         - summary_font.getbbox("Ag")[1]
-        + 4
+        + (4 if compact else 5)
     )
 
     sources = _sources(event)
@@ -656,40 +783,42 @@ def _card_height(
         source_lines = _wrap(
             probe_draw,
             source_text,
-            source_font,
-            max(1, text_width - 70),
+            _font(11),
+            max(1, text_width - 55),
         )[:2]
 
     source_line_height = (
-        source_font.getbbox("Ag")[3]
-        - source_font.getbbox("Ag")[1]
+        _font(11).getbbox("Ag")[3]
+        - _font(11).getbbox("Ag")[1]
         + 2
     )
 
-    height = 45
-
-    if _has_real_image(event):
-        height += image_height + (14 if compact else 22)
+    # Header band + vertical padding.
+    height = 35 + 24
 
     if title_lines:
         height += len(title_lines) * title_line_height + (
-            7 if compact else 12
+            8 if compact else 12
         )
 
     if summary_lines:
         height += len(summary_lines) * summary_line_height + (
-            7 if compact else 15
+            7 if compact else 12
         )
 
     if source_lines:
         height += max(
             15 if compact else 18,
             len(source_lines) * source_line_height,
-        ) + (7 if compact else 10)
+        ) + 7
+
+    # The right-hand image needs enough height to look substantial.
+    if _has_real_image(event):
+        height = max(height, 35 + (155 if compact else 250) + 24)
+    else:
+        height = max(height, min_height)
 
     return max(min_height, min(430, height))
-
-
 
 def render_mobile_edition(
     edition: dict,
@@ -767,27 +896,24 @@ def render_mobile_edition(
             else available_other
         )
 
-        # The lead story always stays alone on Page 01.
-        if event_index == 1 and not pages:
-            pages.append(current_page)
-            current_page = []
-            current_height = 0
-            required = event_height
-            available = available_other
-
-        elif (
-            compact
-            and len(current_page) >= 2
+        # Keep the lead story large, then allow compact stories
+        # to fill the remaining space on Page 01.
+        if (
+            current_page
+            and current_height + required > available
         ):
             pages.append(current_page)
             current_page = []
             current_height = 0
             required = event_height
             available = available_other
-            
-        elif (
-            current_page
-            and current_height + required > available
+
+        # On pages after the first, keep the existing compact-card
+        # limit of two stories per page.
+        if (
+            pages
+            and compact
+            and len(current_page) >= 2
         ):
             pages.append(current_page)
             current_page = []
@@ -803,6 +929,16 @@ def render_mobile_edition(
 
     if not pages:
         pages = [[]]
+
+    print("DEBUG PAGE DISTRIBUTION:")
+    for i, page in enumerate(pages, 1):
+        print(
+            f"  PAGE {i}: "
+            + ", ".join(
+                f"{idx + 1}:{_title(event)[:40]}"
+                for idx, event in enumerate(page)
+            )
+        )
 
     page_files: list[Path] = []
 
@@ -1288,7 +1424,7 @@ def render_mobile_edition(
                 width=2,
             )
 
-            category = _event_category(event)
+            category = _event_card_label(event)
 
             draw.rectangle(
                 (
@@ -1337,7 +1473,7 @@ def render_mobile_edition(
             has_image = _has_real_image(event)
 
             if compact:
-                image_height = 65
+                image_height = 155
                 title_font = _font(20, bold=True)
                 title_max_lines = 2
                 title_spacing = 4
@@ -1361,30 +1497,56 @@ def render_mobile_edition(
                 image_top_offset = 58
                 summary_source_gap = 15
 
-            if has_image:
-                image_top = card_top + image_top_offset
+            # ---------------------------------------------------------
+            # SPLIT CARD — TEXT LEFT / IMAGE RIGHT
+            # ---------------------------------------------------------
 
+            card_inner_left = MARGIN + 16
+            card_inner_right = WIDTH - MARGIN - 16
+            card_inner_top = card_top + 50
+
+            image_width = 330
+            image_gap = 24
+
+            image_left = (
+                card_inner_right
+                - image_width
+            )
+
+            text_x = card_inner_left
+            text_width = (
+                image_left
+                - image_gap
+                - text_x
+            )
+
+            if compact:
+                image_height = min(
+                    155,
+                    card_height - 58,
+                )
+            else:
+                image_height = min(
+                    250,
+                    card_height - 58,
+                )
+
+            if has_image:
                 image = _load_image(
                     event,
-                    text_width,
+                    image_width,
                     image_height,
                 )
 
                 canvas.paste(
                     image,
                     (
-                        text_x,
-                        image_top,
+                        image_left,
+                        card_inner_top,
                     ),
                 )
 
-                title_y = (
-                    image_top
-                    + image_height
-                    + image_title_gap
-                )
-            else:
-                title_y = card_top + 45
+            title_y = card_inner_top
 
             title_end = _draw_wrapped(
                 draw,
