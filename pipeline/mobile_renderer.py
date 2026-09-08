@@ -1135,90 +1135,89 @@ def render_mobile_edition(
         draw: ImageDraw.ImageDraw,
         page_number: int,
     ) -> None:
-        footer_path = Path("assets/footer.png")
+        # -------------------------------------------------------------
+        # FOOTER
+        # PAGE 1  -> assets/footer.png
+        # PAGE 2+ -> assets/footer-pages.png
+        # Visible footer content is aligned to the absolute
+        # bottom edge of the mobile page.
+        # -------------------------------------------------------------
+
+        footer_path = (
+            Path("assets/footer.png")
+            if page_number == 1
+            else Path("assets/footer-pages.png")
+        )
 
         if not footer_path.exists():
             return
 
         try:
             with Image.open(footer_path) as source:
-                footer = source.convert("RGB")
+                footer = source.convert("RGBA")
 
-                
-            # Fit the prepared footer to the full mobile page width.
-            footer = ImageOps.fit(
+            # ---------------------------------------------------------
+            # Remove transparent margins from the source footer.
+            # This makes the visible content itself the reference
+            # for bottom alignment.
+            # ---------------------------------------------------------
+
+            alpha = footer.getchannel("A")
+            bbox = alpha.getbbox()
+
+            if bbox is None:
+                return
+
+            # Обрезаем всё ниже красной полосы.
+            # Красная полоса заканчивается примерно на Y=514.
+            footer = footer.crop(
+                (
+                    bbox[0],
+                    bbox[1],
+                    bbox[2],
+                    514,
+                )
+            )
+
+            # ---------------------------------------------------------
+            # Cut everything below the red bottom stripe.
+            # The red stripe ends at Y=514 in the original asset.
+            # ---------------------------------------------------------
+
+            if page_number == 1:
+                footer = footer.crop((0, 0, footer.width, 515))
+
+            # ---------------------------------------------------------
+            # Fit footer to page width.
+            # ---------------------------------------------------------
+
+            footer = ImageOps.contain(
                 footer,
                 (
                     WIDTH,
-                    footer_height,
+                    MOBILE_PAGE_HEIGHT,
                 ),
                 method=Image.Resampling.LANCZOS,
-                centering=(0.5, 0.5),
             )
 
-            footer_top = MOBILE_PAGE_HEIGHT - footer_height + 53
-
-            # -------------------------------------------------------------
-            # FOOTER
-            # Page 1 = full footer
-            # Pages 2+ = red bottom strip only
-            # -------------------------------------------------------------
-
-            if page_number == 1:
-
-                canvas.paste(
-                    footer,
-                    (
-                        0,
-                        footer_top,
-                    ),
-                )
-
-            else:
-
-                # Red strip at the very bottom
-                red_strip_height = 30
-
-                draw.rectangle(
-                    (
-                         0,
-                        MOBILE_PAGE_HEIGHT - red_strip_height,
-                        WIDTH,
-                        MOBILE_PAGE_HEIGHT,
-                    ),
-                    fill=RED,
-                )
-
             # ---------------------------------------------------------
-            # WORKING QR CODE — BUY ME A COFFEE
-            # PAGE 1 ONLY
+            # Place footer so its bottom edge is exactly
+            # at the bottom edge of the mobile page.
             # ---------------------------------------------------------
-            if page_number == 1:
 
-                qr = qrcode.make(
-                    "https://buymeacoffee.com/aroundthemain"
-                ).convert("RGB")
+            footer_top = MOBILE_PAGE_HEIGHT - footer.height
 
-                qr_size = 133
+            canvas.paste(
+                footer,
+                (
+                    (WIDTH - footer.width) // 2,
+                    footer_top,
+                ),
+                footer,
+            )
 
-                qr = qr.resize(
-                    (qr_size, qr_size),
-                    Image.Resampling.NEAREST,
-                )
-
-                qr_x = WIDTH - MARGIN - qr_size + 17
-                qr_y = footer_top + 11
-
-                canvas.paste(
-                    qr,
-                    (
-                        qr_x,
-                        qr_y,
-                    ),
-                )
-
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"[WARN] Failed to draw footer: {exc}")
 
 
     def draw_markets_today(
@@ -1605,32 +1604,15 @@ def render_mobile_edition(
             )
 
         # -------------------------------------------------------------
-        # PAGES 2+ — ONLY BOTTOM RED STRIPE
+        # PAGES 2+ — DEDICATED FOOTER IMAGE
         # -------------------------------------------------------------
 
         else:
 
-            red_bar_height = 28
-
-            draw.rectangle(
-                (
-                    0,
-                    MOBILE_PAGE_HEIGHT - red_bar_height,
-                    WIDTH,
-                    MOBILE_PAGE_HEIGHT,
-                ),
-                fill=RED,
-            )
-
-            draw.text(
-                (
-                    WIDTH // 2,
-                    MOBILE_PAGE_HEIGHT - red_bar_height // 2,
-                ),
-                "Global News  |  Minimum text  |  Maximum meaning",
-                font=_font(11, bold=False),
-                fill=WHITE,
-                anchor="mm",
+            draw_footer(
+                canvas,
+                draw,
+                page_number,
             )
 
         # -------------------------------------------------------------
