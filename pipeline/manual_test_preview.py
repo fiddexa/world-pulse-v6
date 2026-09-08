@@ -3,7 +3,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from pipeline.production_job import collect_production_articles
-from pipeline.production_scheduler import run_scheduled_edition
+from pipeline.production_job import run_test_production_job
 from pipeline.edition_memory import EditionMemory
 from pipeline.event_memory import EventMemory
 from pipeline.edition_preview import build_edition_preview
@@ -29,14 +29,11 @@ def main():
 
     print("Test time:", now.isoformat())
 
-    test_memory = EditionMemory(
-        db_path="data/manual_test_edition_memory.sqlite3"
-    )
-
-    result = run_scheduled_edition(
-        articles,
-        now,
-        edition_memory=test_memory,
+    result = run_test_production_job(
+        publication_date=now.date(),
+        edition_time=now.strftime("%H:%M"),
+        timeout=20,
+        language="en",
         event_memory=EventMemory(),
     )
 
