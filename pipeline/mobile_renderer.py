@@ -802,7 +802,7 @@ def render_mobile_edition(
     events = _collect_events(edition)
 
     header_height = 300
-    footer_height = 250
+    footer_height = 300
 
     # PAGE 01: full branded header + edition information.
     # PAGES 02+: compact header.
@@ -1139,8 +1139,6 @@ def render_mobile_edition(
         # FOOTER
         # PAGE 1  -> assets/footer.png
         # PAGE 2+ -> assets/footer-pages.png
-        # Visible footer content is aligned to the absolute
-        # bottom edge of the mobile page.
         # -------------------------------------------------------------
 
         footer_path = (
@@ -1157,9 +1155,7 @@ def render_mobile_edition(
                 footer = source.convert("RGBA")
 
             # ---------------------------------------------------------
-            # Remove transparent margins from the source footer.
-            # This makes the visible content itself the reference
-            # for bottom alignment.
+            # Remove transparent margins.
             # ---------------------------------------------------------
 
             alpha = footer.getchannel("A")
@@ -1168,41 +1164,40 @@ def render_mobile_edition(
             if bbox is None:
                 return
 
-            # Обрезаем всё ниже красной полосы.
-            # Красная полоса заканчивается примерно на Y=514.
-            footer = footer.crop(
-                (
-                    bbox[0],
-                    bbox[1],
-                    bbox[2],
-                    514,
-                )
-            )
+            footer = footer.crop(bbox)
 
             # ---------------------------------------------------------
-            # Cut everything below the red bottom stripe.
-            # The red stripe ends at Y=514 in the original asset.
+            # PAGE 1:
+            # Remove everything below the red bottom stripe.
+            # In the original footer asset the stripe ends around Y=514.
             # ---------------------------------------------------------
 
             if page_number == 1:
-                footer = footer.crop((0, 0, footer.width, 515))
+                red_bottom = min(515, footer.height)
+                footer = footer.crop(
+                    (
+                        0,
+                        0,
+                        footer.width,
+                        red_bottom,
+                    )
+                )
 
             # ---------------------------------------------------------
-            # Fit footer to page width.
+            # Fit the footer to the mobile page width.
             # ---------------------------------------------------------
 
             footer = ImageOps.contain(
                 footer,
                 (
                     WIDTH,
-                    MOBILE_PAGE_HEIGHT,
+                    footer_height,
                 ),
                 method=Image.Resampling.LANCZOS,
             )
 
             # ---------------------------------------------------------
-            # Place footer so its bottom edge is exactly
-            # at the bottom edge of the mobile page.
+            # Align the visible footer exactly to the bottom edge.
             # ---------------------------------------------------------
 
             footer_top = MOBILE_PAGE_HEIGHT - footer.height
@@ -1219,7 +1214,7 @@ def render_mobile_edition(
         except Exception as exc:
             print(f"[WARN] Failed to draw footer: {exc}")
 
-
+            
     def draw_markets_today(
         canvas: Image.Image,
         draw: ImageDraw.ImageDraw,
