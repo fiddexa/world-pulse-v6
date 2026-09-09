@@ -1250,272 +1250,79 @@ def render_newspaper(
 
             latest_y += 112
 
-    # ================================================================
     # FOOTER
     # ================================================================
 
-    # Compact footer: social channels + Daily Brief + Support.
-    footer_top = HEIGHT - 295
+    footer_path = Path("assets/footer.png")
+    footer_pages_path = Path("assets/footer-pages.png")
 
+    footer_img = Image.open(
+        footer_path
+    ).convert("RGBA")
+
+    footer_pages_img = Image.open(
+        footer_pages_path
+    ).convert("RGBA")
+
+    # Scale footer to page width
+    footer_width = WIDTH
+
+    footer_height = int(
+        footer_img.height
+        * footer_width
+        / footer_img.width
+    )
+
+    footer_img = footer_img.resize(
+        (footer_width, footer_height),
+        Image.Resampling.LANCZOS,
+    )
+
+    footer_pages_height = int(
+        footer_pages_img.height
+        * footer_width
+        / footer_pages_img.width
+    )
+
+    footer_pages_img = footer_pages_img.resize(
+        (footer_width, footer_pages_height),
+        Image.Resampling.LANCZOS,
+    )
+
+    # Position footer at the bottom
+    footer_y = (
+        HEIGHT
+        - footer_height
+        - footer_pages_height
+    )
+
+    # Black separator immediately above footer
     draw.line(
         (
             MARGIN,
-            footer_top,
+            footer_y - 8,
             WIDTH - MARGIN,
-            footer_top,
+            footer_y - 8,
         ),
         fill=BLACK,
         width=3,
     )
 
-    # ---------------------------------------------------------------
-    # FOLLOW US
-    # ---------------------------------------------------------------
-
-    follow_left = MARGIN
-    follow_top = footer_top + 14
-
-    draw.text(
-        (follow_left, follow_top),
-        "FOLLOW US",
-        font=_font(15, bold=True),
-        fill=BLACK,
+    # Main footer image
+    canvas.paste(
+        footer_img,
+        (0, footer_y),
+        footer_img,
     )
 
-    # All channels on one line to preserve newspaper space.
-    channels_y = footer_top + 46
-
-    draw.text(
-        (follow_left, channels_y),
-        "Telegram",
-        font=_font(14, bold=True),
-        fill=BLACK,
-    )
-
-    # Headphone icon only for Telegram.
-    draw.text(
-        (follow_left + 72, channels_y - 1),
-        "🎧",
-        font=_font(13, bold=True),
-        fill=RED,
-    )
-
-    draw.text(
-        (follow_left + 91, channels_y),
-        TELEGRAM_HANDLE,
-        font=_font(14),
-        fill=BLACK,
-    )
-
-    draw.text(
-        (follow_left + 300, channels_y),
-        "|",
-        font=_font(14),
-        fill=GRAY,
-    )
-
-    draw.text(
-        (follow_left + 320, channels_y),
-        "X",
-        font=_font(14, bold=True),
-        fill=BLACK,
-    )
-
-    draw.text(
-        (follow_left + 345, channels_y),
-        X_HANDLE,
-        font=_font(14),
-        fill=BLACK,
-    )
-
-    draw.text(
-        (follow_left + 555, channels_y),
-        "|",
-        font=_font(14),
-        fill=GRAY,
-    )
-
-    draw.text(
-        (follow_left + 575, channels_y),
-        "Instagram",
-        font=_font(14, bold=True),
-        fill=BLACK,
-    )
-
-    draw.text(
-        (follow_left + 650, channels_y),
-        INSTAGRAM_HANDLE,
-        font=_font(14),
-        fill=BLACK,
-    )
-
-    # ---------------------------------------------------------------
-    # DAILY BRIEF
-    # ---------------------------------------------------------------
-
-    daily_left = MARGIN
-    daily_top = footer_top + 86
-
-    draw.text(
-        (daily_left, daily_top),
-        "DAILY BRIEF",
-        font=_font(16, bold=True),
-        fill=RED,
-    )
-
-    draw.text(
-        (daily_left, daily_top + 27),
-        "The most important stories, delivered in brief.",
-        font=_font(12),
-        fill=BLACK,
-    )
-
-    draw.text(
-        (daily_left, daily_top + 49),
-        "Three times daily",
-        font=_font(11, bold=True),
-        fill=BLACK,
-    )
-
-    draw.text(
-        (daily_left + 122, daily_top + 49),
-        "7:00  |  13:00  |  20:00",
-        font=_font(11),
-        fill=GRAY,
-    )
-
-    # ---------------------------------------------------------------
-    # SUPPORT US
-    # ---------------------------------------------------------------
-
-    support_right = WIDTH - MARGIN
-    support_left = 1010
-    support_top = footer_top + 12
-
-    # Compact support area.
-    draw.text(
-        (support_left, support_top),
-        "SUPPORT US",
-        font=_font(15, bold=True),
-        fill=BLACK,
-    )
-
-    # Small explanatory text stacked underneath.
-    support_text_y = support_top + 31
-
-    draw.text(
-        (support_left, support_text_y),
-        "Your support helps us",
-        font=_font(10),
-        fill=BLACK,
-    )
-
-    draw.text(
-        (support_left, support_text_y + 15),
-        "keep independent news",
-        font=_font(10),
-        fill=BLACK,
-    )
-
-    draw.text(
-        (support_left, support_text_y + 30),
-        "accessible worldwide.",
-        font=_font(10),
-        fill=BLACK,
-    )
-
-    # QR placeholder on the far right.
-    qr_size = 92
-
-    qr_left = (
-        support_right
-        - qr_size
-    )
-
-    qr_top = footer_top + 17
-
-    draw.rectangle(
-        (
-            qr_left,
-            qr_top,
-            qr_left + qr_size,
-            qr_top + qr_size,
-        ),
-        outline=BLACK,
-        width=2,
-    )
-
-    draw.text(
-        (
-            qr_left + 28,
-            qr_top + 31,
-        ),
-        "QR",
-        font=_font(21, bold=True),
-        fill=GRAY,
-    )
-
-    # ================================================================
-    # LEGAL
-    # ================================================================
-
-    legal_y = HEIGHT - 57
-
-    draw.text(
-        (
-            MARGIN,
-            legal_y,
-        ),
-        COPYRIGHT,
-        font=_font(11, bold=True),
-        fill=GRAY,
-    )
-
-    draw.text(
-        (
-            MARGIN,
-            legal_y + 17,
-        ),
-        LEGAL,
-        font=_font(9),
-        fill=GRAY,
-    )
-
-    # ================================================================
-    # BOTTOM TAGLINE
-    # ================================================================
-
-    bar_top = HEIGHT - 25
-
-    draw.rectangle(
+    # Bottom red strip
+    canvas.paste(
+        footer_pages_img,
         (
             0,
-            bar_top,
-            WIDTH,
-            HEIGHT,
+            HEIGHT - footer_pages_height,
         ),
-        fill=RED,
-    )
-
-    font = _font(
-        15,
-        bold=True,
-    )
-
-    bbox = draw.textbbox(
-        (0, 0),
-        TAGLINE,
-        font=font,
-    )
-
-    draw.text(
-        (
-            (WIDTH - (bbox[2] - bbox[0])) / 2,
-            bar_top + 3,
-        ),
-        TAGLINE,
-        font=font,
-        fill=WHITE,
+        footer_pages_img,
     )
 
     # ================================================================
@@ -1529,7 +1336,6 @@ def render_newspaper(
     )
 
     return output
-
 
 # =====================================================================
 # SECTION PAGE RENDERER
