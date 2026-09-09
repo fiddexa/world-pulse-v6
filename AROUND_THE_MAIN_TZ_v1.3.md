@@ -1,0 +1,849 @@
+# AROUND THE MAIN — TECHNICAL SPECIFICATION v1.3
+
+**Project:** WORLD PULSE v6  
+**Public brand:** AROUND THE MAIN  
+**Primary Telegram:** `@aroundthemain`  
+**Status:** Current working production specification
+
+> v1.3 preserves the core architecture of v1.2 and adds the agreed production standards for global source coverage, edition volume, geographic diversity, source attribution, rights awareness, dynamic page density and publication safety.
+
+---
+
+## 1. CORE CONCEPT
+
+AROUND THE MAIN is an automated international news publication that forms multiple editorial editions during the day.
+
+Core principle:
+
+```text
+ONE SET OF INFORMATION
+        ↓
+ONE EDITION
+        ↓
+MULTIPLE PRESENTATIONS
+```
+
+The system must produce an independent editorial product rather than mechanically republishing source headlines.
+
+---
+
+## 2. ARCHITECTURE
+
+```text
+GLOBAL NEWS SOURCES
+        ↓
+COLLECT
+        ↓
+NORMALIZE
+        ↓
+FACT EXTRACTION
+        ↓
+DEDUPLICATION
+        ↓
+EVENT CLUSTERING
+        ↓
+CROSS-SOURCE VERIFICATION
+        ↓
+GEOGRAPHIC COVERAGE ANALYSIS
+        ↓
+EDITORIAL SCORING
+        ↓
+EDITORIAL SELECTION
+        ↓
+ONE EDITION MODEL
+      ↙     ↓      ↘
+   FULL   MOBILE   AUDIO
+      \      ↓      /
+       TELEGRAM PUBLISHER
+             ↓
+       @aroundthemain
+```
+
+Responsibilities remain separated:
+
+- **DATA:** what happened;
+- **EDITORIAL LOGIC:** what should be published;
+- **EDITION:** which snapshot was formed;
+- **RENDERER:** how it looks;
+- **PUBLISHER:** where it is delivered.
+
+---
+
+## 3. DAILY EDITIONS
+
+Current schedule:
+
+```text
+America/New_York
+
+07:00 — MORNING BRIEFING
+13:00 — MIDDAY UPDATE
+20:00 — EVENING ROUND-UP
+```
+
+Each edition receives its own Edition ID.
+
+Each edition is a new editorial snapshot, not an automatic continuation of the previous edition.
+
+---
+
+## 4. EDITORIAL SNAPSHOT
+
+The system evaluates information available by the edition's editorial snapshot time.
+
+Do not use a rigid rule such as "last 6 hours" or "last 24 hours" as the sole selection mechanism.
+
+Where available, distinguish:
+
+- `event_time` — when the event happened;
+- `published_at` — when a source published the report;
+- `first_seen_at` — when the system first received the information;
+- `last_updated_at` — when meaningful new information became available;
+- `editorial_time` — the snapshot time of the edition.
+
+A late report may therefore appear in a later edition if it was not available for the earlier snapshot.
+
+Continuing events may be reconsidered in later editions when meaningful developments occur.
+
+---
+
+## 5. SOURCE NETWORK
+
+The production system must use a broad international source network.
+
+### Target
+
+```text
+≈ 25–40 active production sources
+```
+
+The exact number is dynamic. Quality and regional diversity are more important than an arbitrary source count.
+
+The network should include a mixture of:
+
+1. major international news organizations;
+2. regional and national media;
+3. specialist sources where appropriate;
+4. primary institutional sources;
+5. official government and public-agency sources.
+
+Examples of institutional sources include UN, WHO, World Bank, IMF, IEA, OPEC, central banks and government/public agencies.
+
+International and regional coverage should collectively seek meaningful representation from:
+
+- North America;
+- Latin America and the Caribbean;
+- Europe;
+- Africa;
+- Middle East;
+- Central Asia;
+- South Asia;
+- East Asia;
+- Southeast Asia;
+- Oceania.
+
+The registry must not claim a source as active until its production feed/API is actually configured and functioning.
+
+A failed source connector must not cause successful sources to be discarded.
+
+---
+
+## 6. SOURCE INDEPENDENCE
+
+Source count is not the same as independent confirmation.
+
+Multiple websites may reproduce one wire report. The system should distinguish, where technically possible:
+
+- independent reporting;
+- primary/official statement;
+- direct reporting;
+- syndicated content;
+- republished content;
+- aggregated content;
+- unknown derivation.
+
+Cross-source verification should reward genuinely independent confirmation rather than duplicate copies of the same report.
+
+---
+
+## 7. NEWS COLLECTION VOLUME
+
+The system must distinguish candidate collection from final publication.
+
+### Candidate pool
+
+Normal production target:
+
+```text
+80–150+ candidate articles per edition run
+```
+
+The result may be lower or higher according to actual source availability and source health.
+
+### Final edition
+
+Default target:
+
+```text
+12–16 published stories
+Target ≈ 14
+```
+
+High-density editions may contain:
+
+```text
+16–20 stories
+```
+
+Practical lower threshold:
+
+```text
+≈ 10 stories
+```
+
+The system must never create weak or repetitive stories solely to reach a numerical target.
+
+If the news cycle genuinely provides fewer publishable stories, editorial quality takes precedence.
+
+---
+
+## 8. GLOBAL COVERAGE
+
+A central production objective is:
+
+> **MAXIMUM MEANINGFUL COVERAGE OF THE WORLD IN EVERY EDITION.**
+
+Geographic diversity is an editorial objective, not a hard quota.
+
+Normal target:
+
+```text
+8–12+ countries where the news cycle supports it
+6–8+ world regions where relevant
+```
+
+The selection engine should consider:
+
+- country;
+- region;
+- continent;
+- cross-border impact;
+- international relevance;
+- event significance;
+- source confidence;
+- freshness;
+- momentum.
+
+Avoid unnecessary concentration on one country, region or conflict when other important international developments are available.
+
+Exceptional global events may legitimately occupy several positions.
+
+The system must never add a weak story from an underrepresented country simply to satisfy a geographic quota.
+
+---
+
+## 9. DEDUPLICATION AND EVENT CLUSTERING
+
+Many source articles about one event should normally become one editorial event.
+
+```text
+20 REPORTS
+    ↓
+EVENT CLUSTER
+    ↓
+VERIFIED FACT SET
+    ↓
+ONE EDITORIAL STORY
+```
+
+The system must detect duplicate and near-duplicate reporting and avoid publishing the same event repeatedly in one edition.
+
+A later meaningful development can create a new editorial treatment in a later edition.
+
+---
+
+## 10. EDITORIAL SELECTION
+
+Editorial hierarchy:
+
+```text
+LEAD_STORY
+↓
+TOP_STORY
+↓
+SECTION_STORY
+↓
+MAIN_STORY
+↓
+BRIEF
+```
+
+Ranking should consider:
+
+- importance;
+- score;
+- category;
+- freshness;
+- source reputation;
+- source independence;
+- verification;
+- global impact;
+- international reach;
+- momentum;
+- current relevance;
+- publishability.
+
+The editorial engine must select a balanced edition, not simply the highest-scoring articles in isolation.
+
+---
+
+## 11. EDITORIAL PRODUCT
+
+AROUND THE MAIN independently forms:
+
+- headline;
+- summary;
+- Why It Matters;
+- editorial priority;
+- section;
+- page placement;
+- final edition structure.
+
+The final text should be original editorial writing based on verified facts.
+
+The system must not invent:
+
+- facts;
+- quotations;
+- figures;
+- motives;
+- forecasts;
+- unsupported causal explanations.
+
+---
+
+## 12. CATEGORIES
+
+Current newspaper directions:
+
+1. World
+2. Geopolitics / Politics
+3. Business / Economy
+4. Energy
+5. Technology
+6. Science & Health
+7. Climate
+8. Trade & Logistics
+9. Society
+10. Culture
+11. Sports
+
+Categories are dynamic according to available and important news.
+
+Do not artificially create categories or stories to fill a page.
+
+---
+
+## 13. EDITION MODEL
+
+The edition is the single source of truth for all presentation layers.
+
+Minimum structure:
+
+```python
+edition = {
+    "edition_id": "...",
+    "publication_date": "...",
+    "edition_time": "...",
+    "top_story": ...,
+    "main_stories": [...],
+    "briefs": [...],
+    "sections": {...},
+}
+```
+
+Full, Mobile and Audio must use the same editorial selection, date, time, Edition ID and source metadata.
+
+---
+
+## 14. FULL EDITION
+
+Full Edition is the digital newspaper presentation.
+
+It may contain:
+
+- lead story;
+- main stories;
+- briefs;
+- photographs;
+- maps;
+- charts;
+- timelines;
+- infographics;
+- section headings;
+- date;
+- edition number;
+- page number;
+- footer.
+
+Page count is dynamic.
+
+The layout must prioritize information density, hierarchy and readability.
+
+---
+
+## 15. MOBILE EDITION
+
+Mobile Edition is a separate presentation layer of the same Edition Model.
+
+It is designed for smartphone reading, vertical scrolling and Telegram.
+
+Every news card should contain:
+
+1. Image;
+2. Headline;
+3. Summary;
+4. Why It Matters;
+5. Sources.
+
+A story must never be split between pages.
+
+### Dynamic page planning
+
+Pages must be populated according to actual story count and card heights.
+
+The renderer must:
+
+- minimize large empty regions;
+- fit as many appropriate stories as practical on each page;
+- preserve story integrity;
+- adapt card height to content;
+- preserve image proportions;
+- keep visual hierarchy;
+- retain the established first-page branded header;
+- retain the established compact headers on later pages;
+- keep the footer consistent.
+
+The goal is:
+
+> **HIGH INFORMATION DENSITY WITHOUT VISUAL CROWDING.**
+
+---
+
+## 16. MOBILE PAGE STRUCTURE
+
+### PAGE 01
+
+- branded header image: `assets/mobile-header.png`;
+- edition label;
+- publication date;
+- edition name;
+- PAGE 01;
+- news content;
+- Daily Brief/footer area.
+
+### PAGES 02+
+
+- compact edition/header row;
+- PAGE XX;
+- divider;
+- news content;
+- same footer system.
+
+Page number is dynamic and must not be stored in a global variable.
+
+---
+
+## 17. VISUAL SYSTEM
+
+Use the established newspaper visual language:
+
+- cream/paper background;
+- black primary text;
+- red accent;
+- strict newspaper aesthetic;
+- high information density;
+- minimum decoration;
+- maximum useful news space.
+
+Visual material must have editorial value.
+
+AI-generated visuals must never be presented as authentic documentary photographs or real evidence of an event.
+
+---
+
+## 18. SOURCE ATTRIBUTION
+
+Each published story must identify the meaningful sources actually used.
+
+Example:
+
+```text
+SOURCE
+Reuters • BBC • Government of Japan
+```
+
+or:
+
+```text
+SOURCE
+UN News • WHO
+```
+
+Attribution must be truthful and must not be added merely to create an appearance of verification.
+
+Source names and trademarks remain the property of their respective owners. A source citation does not imply endorsement, sponsorship, affiliation or partnership.
+
+---
+
+## 19. RIGHTS-AWARE CONTENT POLICY
+
+AROUND THE MAIN must be designed to reduce copyright and other rights risks.
+
+### Text policy
+
+Third-party articles are information inputs. The final AROUND THE MAIN story should be independently written and substantially transformed into the publication's own concise editorial presentation.
+
+Do not systematically reproduce:
+
+- full source articles;
+- long verbatim passages;
+- source-specific article structures;
+- copyrighted material merely because a source is credited.
+
+Attribution is **not a substitute for permission or a license**.
+
+### Images
+
+Image rights must be treated separately from text attribution.
+
+Only use images that are:
+
+- properly licensed;
+- authorized for the intended use;
+- public domain;
+- legally reusable under an applicable exception or permission;
+- otherwise cleared by the project.
+
+The presence of an image on a news website does not itself establish reuse rights.
+
+If rights are uncertain, do not publish the image. Use a cleared image, public-domain visual, licensed asset, chart/map generated from lawful data, or an appropriately labeled AI-generated illustration where suitable.
+
+### Provenance
+
+For each published image, store available provenance/rights metadata such as:
+
+- source/provider;
+- original URL where appropriate;
+- license or usage basis;
+- acquisition timestamp;
+- rights status;
+- attribution requirements.
+
+---
+
+## 20. EDITORIAL NOTICE
+
+A short notice may appear at the end of the publication, before the final footer, or in the website's Editorial & Content Policy:
+
+> **Editorial Notice:** AROUND THE MAIN independently selects, verifies and summarizes information from multiple sources. Source attribution is provided for reference and transparency. Third-party names, trademarks, photographs and other protected materials remain the property of their respective owners. Attribution does not imply endorsement, affiliation or a license to reproduce third-party content.
+
+The notice is a transparency measure, **not a legal shield**. It does not replace licensing, rights clearance, legal review or compliance with applicable law.
+
+The production system should support a full public Editorial & Content Policy before commercial/public launch.
+
+---
+
+## 21. CORRECTIONS AND RIGHTS REQUESTS
+
+A production-ready system should provide a visible process for:
+
+- factual corrections;
+- source attribution corrections;
+- image rights concerns;
+- rights-holder requests;
+- takedown requests;
+- editorial complaints.
+
+Requests and corrections should be traceable to Edition ID and story metadata where possible.
+
+---
+
+## 22. TELEGRAM
+
+Production destination:
+
+```text
+@aroundthemain
+```
+
+Old production identifier:
+
+```text
+@WorldPulseDaily
+```
+
+The old channel must not be used as the production destination.
+
+Mandatory order:
+
+```text
+🎧 AUDIO EDITION
+        ↓
+📰 TEXT / PRINTED EDITION
+```
+
+Audio and text must belong to the same Edition ID.
+
+---
+
+## 23. TELEGRAM SECURITY
+
+Credentials must be supplied through environment variables only:
+
+```text
+TELEGRAM_BOT_TOKEN
+TELEGRAM_CHAT_ID
+```
+
+Never commit, hard-code, print or expose credentials in:
+
+- source code;
+- README;
+- TЗ;
+- tests;
+- logs;
+- screenshots.
+
+---
+
+## 24. EDITION ID
+
+Every edition receives a deterministic stable identifier containing, at minimum:
+
+- publication date;
+- edition time;
+- language.
+
+Conceptual format:
+
+```text
+AROUND-THE-MAIN-EN-2026-08-30-0700
+```
+
+All presentation and delivery artifacts belonging to the same edition use the same Edition ID.
+
+---
+
+## 25. EVENT MEMORY
+
+Persistent Event Memory is required.
+
+Target recent-memory horizon:
+
+```text
+≈ 30 days
+```
+
+It should recognize:
+
+- previously published events;
+- continuing stories;
+- new developments;
+- duplicate reports;
+- prior coverage.
+
+Memory must not become a blanket ban on later editorial reconsideration.
+
+---
+
+## 26. ARCHIVE
+
+Each edition must be reproducible.
+
+Persist, where available:
+
+- Edition ID;
+- publication date;
+- edition time;
+- editorial snapshot time;
+- selected stories;
+- source metadata;
+- image provenance/rights metadata;
+- rendered output;
+- audio output;
+- QC result;
+- publication status;
+- delivery identifiers.
+
+---
+
+## 27. QUALITY CONTROL
+
+Before publication, QC must check:
+
+### Editorial
+
+- factual accuracy;
+- source quality;
+- source independence where claimed;
+- event clustering;
+- duplicate detection;
+- global geographic coverage;
+- editorial relevance;
+- publishability.
+
+### Content
+
+- original headline;
+- accurate summary;
+- Why It Matters;
+- correct source attribution;
+- correct section.
+
+### Layout
+
+- no broken blocks;
+- no unintended large empty regions;
+- readable typography;
+- correct page numbers;
+- correct edition/date;
+- correct image proportions.
+
+### Rights
+
+- image provenance recorded where applicable;
+- rights/usage status known;
+- unresolved rights not silently published.
+
+### Delivery
+
+- correct Edition ID;
+- correct Telegram destination;
+- correct publication order;
+- consistent package metadata;
+- idempotency readiness.
+
+---
+
+## 28. IDEMPOTENCY
+
+Production delivery is idempotent.
+
+```text
+SAME EDITION
++
+SAME CHANNEL
+        ↓
+ALREADY SENT
+        ↓
+SKIPPED
+```
+
+Failed deliveries may be retried. Successful deliveries must not be duplicated after process restart, scheduler duplication or runner restart.
+
+---
+
+## 29. AUTONOMOUS PRODUCTION
+
+After launch, ordinary production must operate without:
+
+- an open browser;
+- an active ChatGPT session;
+- an active Codespace;
+- the user's computer;
+- manual publication commands.
+
+Codespace is a development environment, not the permanent production scheduler.
+
+---
+
+## 30. TESTING
+
+Test independently:
+
+- source collection;
+- normalization;
+- clustering;
+- verification;
+- editorial selection;
+- global coverage balancing;
+- Edition Model;
+- Full renderer;
+- Mobile renderer;
+- Audio;
+- Telegram publication;
+- idempotency;
+- failure recovery;
+- rights metadata and publication blocking.
+
+Unit tests, local previews and mock publisher tests must never automatically publish real Telegram messages.
+
+---
+
+## 31. PRODUCTION READINESS GATES
+
+Autonomous public launch requires, at minimum:
+
+1. broad active source registry;
+2. working source-health monitoring;
+3. candidate collection at the intended production scale;
+4. geographic coverage measurement;
+5. independent event clustering and verification;
+6. final story-volume control;
+7. dynamic page-density control;
+8. rights-aware image handling;
+9. source attribution;
+10. corrections/rights-request procedure;
+11. complete Full/Mobile/Audio package consistency;
+12. Telegram idempotency;
+13. hosted scheduler;
+14. monitoring and alerting;
+15. failure recovery and controlled retries;
+16. complete end-to-end rehearsal.
+
+---
+
+## 32. IMPLEMENTATION PRIORITY
+
+```text
+1. SOURCE NETWORK EXPANSION
+2. GLOBAL COVERAGE ENGINE
+3. EDITORIAL VOLUME / SELECTION
+4. DYNAMIC PAGE PLANNING
+5. RIGHTS-AWARE CONTENT + IMAGE PROVENANCE
+6. FULL / MOBILE / AUDIO HARDENING
+7. END-TO-END QC
+8. HOSTED AUTONOMOUS PRODUCTION
+```
+
+Do not optimize decorative layout before the source, editorial and page-planning layers are stable.
+
+---
+
+## 33. CANONICAL RULE
+
+```text
+ONE EDITION
+      ↓
+ONE EDITORIAL SELECTION
+      ↓
+FULL + MOBILE + AUDIO
+      ↓
+ONE EDITION ID
+      ↓
+TELEGRAM @aroundthemain
+```
+
+The publication goal is:
+
+> **A dense, accurate, internationally representative snapshot of the world — three times a day.**
+
+---
+
+## 34. STATUS
+
+**Version:** v1.3  
+**Status:** Current working production specification  
+**Primary Telegram:** `@aroundthemain`  
+**Architecture:** ONE EDITION → MULTIPLE PRESENTATIONS
