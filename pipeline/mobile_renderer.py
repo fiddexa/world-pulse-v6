@@ -1202,6 +1202,7 @@ def render_mobile_edition(
 
             footer_top = MOBILE_PAGE_HEIGHT - footer.height
 
+            
             canvas.paste(
                 footer,
                 (
@@ -1210,6 +1211,8 @@ def render_mobile_edition(
                 ),
                 footer,
             )
+
+            return footer_top            
 
         except Exception as exc:
             print(f"[WARN] Failed to draw footer: {exc}")
@@ -1231,7 +1234,7 @@ def render_mobile_edition(
         draw.text(
             (MARGIN, y),
             "MARKETS TODAY",
-            font=_font(13, bold=True),
+            font=_font(17, bold=True),
             fill=RED,
         )
 
@@ -1240,17 +1243,27 @@ def render_mobile_edition(
         # -------------------------------------------------------------
         row1_y = y + 22
 
+        label = "INDEXES"
+
         draw.text(
             (MARGIN, row1_y),
-            "INDEXES",
-            font=_font(9, bold=True),
+            label,
+            font=_font(12, bold=True),
             fill=BLACK,
         )
 
+        label_bbox = draw.textbbox(
+            (MARGIN, row1_y),
+            label,
+            font=_font(12, bold=True),
+        )
+
+        data_x = label_bbox[2] + 10
+
         draw.text(
-            (MARGIN + 52, row1_y),
+            (data_x, row1_y),
             "S&P 500  7,747.71  +1.06%   |   NASDAQ  26,584.06  +1.40%   |   DOW  53,686.11  +1.18%",
-            font=_font(8),
+            font=_font(11),
             fill=GRAY,
         )
 
@@ -1259,17 +1272,27 @@ def render_mobile_edition(
         # -------------------------------------------------------------
         row2_y = y + 40
 
+        label = "COMMODITIES"
+
         draw.text(
             (MARGIN, row2_y),
-            "COMMODITIES",
-            font=_font(9, bold=True),
+            label,
+            font=_font(12, bold=True),
             fill=BLACK,
         )
 
+        label_bbox = draw.textbbox(
+            (MARGIN, row2_y),
+            label,
+            font=_font(12, bold=True),
+        )
+
+        data_x = label_bbox[2] + 10
+
         draw.text(
-            (MARGIN + 82, row2_y),
+            (data_x, row2_y),
             "BRENT  $95.69  +0.46%   |   GOLD  $4,520.40  +0.96%   |   WTI  $91.71  +1.01%",
-            font=_font(8),
+            font=_font(11),
             fill=GRAY,
         )
 
@@ -1278,17 +1301,27 @@ def render_mobile_edition(
         # -------------------------------------------------------------
         row3_y = y + 58
 
+        label = "CURRENCY / GLOBAL"
+
         draw.text(
             (MARGIN, row3_y),
-            "CURRENCY / GLOBAL",
-            font=_font(9, bold=True),
+            label,
+            font=_font(12, bold=True),
             fill=BLACK,
         )
 
+        label_bbox = draw.textbbox(
+            (MARGIN, row3_y),
+            label,
+            font=_font(12, bold=True),
+        )
+
+        data_x = label_bbox[2] + 10
+
         draw.text(
-            (MARGIN + 108, row3_y),
+            (data_x, row3_y),
             "EUR/USD  1.1627   |   DXY  99.12  +0.27%   |   USD/CNY  6.7113  -0.11%",
-            font=_font(8),
+            font=_font(11),
             fill=GRAY,
         )
 
@@ -1297,17 +1330,27 @@ def render_mobile_edition(
         # -------------------------------------------------------------
         row4_y = y + 76
 
+        label = "MARKET LEADERS"
+
         draw.text(
             (MARGIN, row4_y),
-            "MARKET LEADERS",
-            font=_font(9, bold=True),
+            label,
+            font=_font(12, bold=True),
             fill=BLACK,
         )
 
+        label_bbox = draw.textbbox(
+            (MARGIN, row4_y),
+            label,
+            font=_font(12, bold=True),
+        )
+
+        data_x = label_bbox[2] + 10
+
         draw.text(
-            (MARGIN + 91, row4_y),
+            (data_x, row4_y),
             "NVIDIA  +1.80%   |   APPLE  +1.00%   |   TESLA  +5.42%",
-            font=_font(8),
+            font=_font(11),
             fill=GRAY,
         )
 
@@ -1584,7 +1627,7 @@ def render_mobile_edition(
 
         if page_number == 1:
 
-            markets_y = MOBILE_PAGE_HEIGHT - footer_height - 43
+            markets_y = MOBILE_PAGE_HEIGHT - footer_height + 30
 
             draw_markets_today(
                 canvas,
@@ -1592,11 +1635,23 @@ def render_mobile_edition(
                 markets_y,
             )
 
-            draw_footer(
+            footer_top = draw_footer(
                 canvas,
                 draw,
                 page_number,
             )
+
+            if footer_top is not None:
+                draw.line(
+                    (
+                        0,
+                        footer_top - 2,
+                        WIDTH,
+                        footer_top - 2,
+                    ),
+                    fill=BLACK,
+                    width=3,
+                )
 
         # -------------------------------------------------------------
         # PAGES 2+ — DEDICATED FOOTER IMAGE
