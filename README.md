@@ -3,975 +3,648 @@
 **MINIMUM TEXT. MAXIMUM CLARITY.**  
 **VERIFIED FACTS. CLEAR SOURCES. NO AUTOMATED OPINION.**
 
-AROUND THE MAIN is an automated international news publication system designed to transform verified global information into concise, neutral and clearly sourced newspaper-style editions.
+AROUND THE MAIN is an automated international news publication system. It transforms information from a broad international source network into concise, neutral, contextualized and clearly attributed newspaper-style editions.
 
-AROUND THE MAIN is **not a headline aggregator**. International sources provide the information used by the system; the final product is a structured news edition built from verified information, source attribution and editorial selection.
+**AROUND THE MAIN is not a headline-copying aggregator.** Sources provide reporting, facts, data and context; the final product is independently selected, verified, structured and written.
+
+> **Current specification: `AROUND_THE_MAIN_TZ_v1.3.md`**
 
 ---
 
-## Current Launch Configuration
+## 1. Current Configuration
 
-| Parameter | Configuration |
+| Parameter | Value |
 |---|---|
-| Publication language | English |
-| Audience timezone | `America/New_York` |
+| Brand | AROUND THE MAIN |
+| Technical project | WORLD PULSE v6 |
+| Language | English |
+| Timezone | `America/New_York` |
 | Daily editions | 3 |
-| Edition times | 07:00 / 13:00 / 20:00 |
-| Telegram channel | `@aroundthemain` |
-| Telegram format | Audio Edition → Text Edition |
-| Operation model | Fully autonomous after production launch |
+| Schedule | 07:00 / 13:00 / 20:00 |
+| Telegram | `@aroundthemain` |
+| Telegram order | Audio → Text / Printed |
+| Architecture | ONE EDITION → MULTIPLE PRESENTATIONS |
 
 ---
 
-## Editorial Snapshot Model
-
-The three daily editions are **three independent editorial decisions**, not three automatic re-publications of the same news feed.
+## 2. Core Pipeline
 
 ```text
-07:00 → NEW INFORMATION SNAPSHOT → AROUND THE MAIN 07:00
-13:00 → NEW INFORMATION SNAPSHOT → AROUND THE MAIN 13:00
-20:00 → NEW INFORMATION SNAPSHOT → AROUND THE MAIN 20:00
-```
-
-Before each edition, AROUND THE MAIN must collect and process the information available from its configured international sources and determine what is most important for the world audience at that moment.
-
-The central editorial question is:
-
-> **What do we know by the time of this edition, and which of the known events are most important to the global audience right now?**
-
-### The system does not use a rigid "last N hours" rule
-
-Publication time from a source is only one signal. AROUND THE MAIN must not automatically use rules such as:
-
-- include everything published within 6 hours;
-- exclude everything older than 24 hours;
-- include everything published before a fixed hour.
-
-Freshness is an input to editorial evaluation, not the editorial decision itself.
-
-### Four different time concepts
-
-Where possible, the system should distinguish:
-
-- `event_time` — when the event happened;
-- `published_at` — when a source published a report;
-- `first_seen_at` — when AROUND THE MAIN first received the information;
-- `last_updated_at` — when significant new information became available;
-- `editorial_time` — the time used for the edition's editorial snapshot.
-
-These timestamps must not be treated as interchangeable.
-
-### Late information example
-
-If an earthquake occurs at 05:30 but the first relevant source report becomes available to AROUND THE MAIN at 07:20:
-
-```text
-07:00 snapshot → information not yet available → cannot be selected
-13:00 snapshot → information is available → may be selected
-```
-
-Selection at 13:00 still depends on verification, significance, current relevance and competition with other events.
-
-### Re-evaluation across editions
-
-The same event may be considered again in a later edition. Previous publication does not automatically suppress future editorial evaluation.
-
-A continuing event may become more or less important depending on:
-
-- new facts;
-- new confirmations;
-- changing casualty or damage information;
-- new official statements;
-- international reaction;
-- escalation or de-escalation;
-- other meaningful developments.
-
-Event Memory provides historical context and duplicate awareness; it must not become a blanket ban on reconsidering a previously seen event.
-
-### Own editorial product
-
-AROUND THE MAIN uses source material as input and independently forms:
-
-- the headline;
-- the summary;
-- the editorial priority;
-- the section assignment;
-- the structure of the edition.
-
-The system should combine and compare multiple reports about the same event rather than treating every source headline as a separate final story.
-
-```text
-INFORMATION FROM OUR SOURCES
-            ↓
-COLLECTION
-            ↓
-NORMALIZATION / FACT EXTRACTION
-            ↓
+GLOBAL SOURCE NETWORK
+        ↓
+COLLECT
+        ↓
+NORMALIZE
+        ↓
+FACT EXTRACTION
+        ↓
+DEDUPLICATION
+        ↓
 EVENT CLUSTERING
-            ↓
+        ↓
 CROSS-SOURCE VERIFICATION
-            ↓
-CURRENT EVENT ANALYSIS
-            ↓
-EDITORIAL SNAPSHOT
-            ↓
-RANKING / EDITORIAL SELECTION
-            ↓
-AROUND THE MAIN HEADLINE + SUMMARY
-            ↓
-AROUND THE MAIN EDITION
+        ↓
+GEOGRAPHIC COVERAGE
+        ↓
+EDITORIAL SCORING
+        ↓
+EDITORIAL SELECTION
+        ↓
+ONE EDITION MODEL
+      ↙     ↓      ↘
+   FULL   MOBILE   AUDIO
+        ↓
+TELEGRAM @aroundthemain
 ```
 
-**Each edition = new information collection + new analysis + new editorial decision.**
-
-The previous edition is historical context, not the template for the next edition.
+The data, editorial logic, edition model, renderer and publisher remain separate responsibilities.
 
 ---
 
-## Core Pipeline
+## 3. One Edition
+
+Each scheduled run creates one editorial snapshot and one Edition ID.
 
 ```text
-News Collection
-      ↓
-Normalization
-      ↓
-Fact Extraction
-      ↓
-Clustering
-      ↓
-Verification
-      ↓
-Intelligence / Context
-      ↓
-Editorial Snapshot
-      ↓
-Ranking
-      ↓
-Editorial Selection
-      ↓
-Edition Builder
-      ↓
-Visual Engine
-      ↓
-Audio Edition
-      ↓
-Quality Control
-      ↓
-Delivery Policy
-      ↓
-Persistent Delivery State
-      ↓
-Telegram
+ONE EDITION
+ ├── 📰 FULL EDITION
+ ├── 📱 MOBILE EDITION
+ └── 🎧 AUDIO EDITION
+```
+
+All presentations use the same:
+
+- Edition ID;
+- publication date;
+- edition time;
+- selected stories;
+- editorial priorities;
+- source metadata.
+
+The Edition Model contains, at minimum:
+
+```python
+{
+    "edition_id": "...",
+    "publication_date": "...",
+    "edition_time": "...",
+    "top_story": ...,
+    "main_stories": [...],
+    "briefs": [...],
+    "sections": {...},
+}
 ```
 
 ---
 
-## Editorial Directions
+## 4. Editorial Snapshot
 
-AROUND THE MAIN uses 14 established editorial directions:
+The three editions are three independent editorial decisions, not automatic re-publications of one feed.
 
-1. World
-2. Politics
-3. Economy
-4. Finance
-5. Business
-6. Technology
-7. Science
-8. Energy
-9. Markets
-10. Security
-11. Climate
-12. Society
-13. Health
-14. Culture
+```text
+07:00 → NEW INFORMATION SNAPSHOT → EDITION
+13:00 → NEW INFORMATION SNAPSHOT → EDITION
+20:00 → NEW INFORMATION SNAPSHOT → EDITION
+```
 
-Sections are included dynamically according to the importance and availability of relevant news.
+The system evaluates information actually available at the snapshot time. A rigid "last N hours" rule must not determine selection by itself.
 
-The system must never artificially fill an edition.
+Where available, distinguish:
+
+- `event_time`;
+- `published_at`;
+- `first_seen_at`;
+- `last_updated_at`;
+- `editorial_time`.
+
+Continuing events may be reconsidered when meaningful developments occur.
 
 ---
 
-## Editorial Principles
+## 5. Global News Coverage
 
-AROUND THE MAIN follows two primary principles:
+The primary editorial objective is:
 
-> **MINIMUM TEXT. MAXIMUM MEANING.**
+> **MAXIMUM MEANINGFUL COVERAGE OF THE WORLD IN EVERY EDITION.**
 
-> **VERIFIED FACTS. CLEAR SOURCES. NO AUTOMATED OPINION.**
+A normal edition should target, where the news cycle supports it:
 
-The publication is designed to be:
+- **8–12+ countries**;
+- **6–8+ world regions**.
 
-- factual;
-- neutral;
-- concise;
-- internationally oriented;
-- contextual;
-- source-conscious;
-- editorially selective.
+Relevant regions include North America, Latin America/Caribbean, Europe, Africa, Middle East, Central Asia, South Asia, East Asia, Southeast Asia and Oceania.
+
+Geographic diversity is **not a hard quota**. Important global events may occupy multiple positions. Weak stories must never be added merely to satisfy geography.
+
+The selection engine should balance:
+
+- country;
+- region;
+- continent;
+- cross-border impact;
+- international reach;
+- global significance;
+- freshness;
+- momentum;
+- verification confidence.
+
+The edition should not be dominated by one country or conflict when other important international developments are available.
+
+---
+
+## 6. News Volume
+
+The system separates candidate collection volume from final publication volume.
+
+### Candidate pool
+
+Normal target:
+
+```text
+80–150+ candidate articles per edition run
+```
+
+Actual collection may vary with source availability and health.
+
+### Final publication
+
+Default target:
+
+```text
+12–16 stories
+Target ≈ 14
+```
+
+High-density edition:
+
+```text
+16–20 stories
+```
+
+Practical lower threshold:
+
+```text
+≈ 10 stories
+```
+
+The system must never create weak, repetitive or low-value stories simply to reach a target.
+
+Page count is dynamic and follows actual editorial volume.
+
+---
+
+## 7. Source Network
+
+Target production network:
+
+```text
+≈ 25–40 active sources
+```
+
+The exact number is dynamic; quality, reliability, independence and geographic diversity matter more than the number itself.
+
+The source registry should combine:
+
+- major international news organizations;
+- regional/national media;
+- specialist sources where useful;
+- primary institutions;
+- governments and public agencies.
+
+Institutional examples include UN, WHO, World Bank, IMF, IEA, OPEC, central banks and public agencies.
+
+The registry must not claim a source as active until its production RSS/Atom/API connector is actually configured and functioning.
+
+One failed connector must not discard successful results from other sources.
+
+### Source independence
+
+Several sites repeating one wire report are not necessarily independent confirmations. Where possible, classify sources as:
+
+- independent reporting;
+- primary/official statement;
+- direct reporting;
+- syndicated;
+- republished;
+- aggregated;
+- unknown derivation.
+
+---
+
+## 8. Editorial Selection
+
+Editorial hierarchy:
+
+```text
+LEAD_STORY
+↓
+TOP_STORY
+↓
+SECTION_STORY
+↓
+MAIN_STORY
+↓
+BRIEF
+```
+
+Ranking considers, where available:
+
+- importance;
+- score;
+- category;
+- freshness;
+- source reputation;
+- source independence;
+- verification;
+- global impact;
+- international reach;
+- momentum;
+- current relevance;
+- publishability.
+
+The final selection must be balanced rather than simply taking the highest individual scores.
+
+---
+
+## 9. Editorial Product
+
+AROUND THE MAIN independently forms:
+
+- headline;
+- summary;
+- Why It Matters;
+- editorial priority;
+- section;
+- page placement;
+- final edition structure.
+
+Source reporting is used as information input. The system must not systematically reproduce full articles, long verbatim passages or source-specific article structures.
 
 The system must never invent facts, quotations, figures, motives, forecasts or unsupported explanations.
 
 ---
 
-## News Intelligence
+## 10. Source Attribution
 
-The pipeline transforms multiple reports into verified events.
+Every published story should identify the meaningful sources actually used.
+
+Example:
 
 ```text
-Many Articles
-      ↓
-Event Clustering
-      ↓
-One Verified Event
+SOURCE
+Reuters • BBC • Government of Japan
 ```
 
-Each event may be evaluated using:
+Attribution must be truthful and must not be added merely to create an appearance of verification.
 
-- Source Reputation;
-- Source Independence;
-- Verification;
-- Freshness;
-- Global Impact;
-- Momentum;
-- International Reach;
-- Editorial Significance;
-- Current relevance to the edition snapshot.
-
-A single event may be relevant to multiple editorial directions but should not be published multiple times simply because it belongs to multiple sections.
+Source names and trademarks remain the property of their respective owners. Mentioning a source does not imply endorsement, sponsorship, affiliation or partnership.
 
 ---
 
-## Front Page
+## 11. Rights-Aware Content Standard
 
-The Front Page is dynamic.
+**Attribution is not a license to copy.**
 
-It prioritizes the most important stories of each edition according to factors such as:
+Text and image rights are separate.
 
-- Global Impact;
-- Freshness;
-- Momentum;
-- Source Confidence;
-- International Reach;
-- Editorial Significance;
-- relevance at the current Editorial Snapshot.
+### Text
 
-The Front Page is not a mechanical list of every story.
+Third-party reporting is an information input. AROUND THE MAIN should produce original headlines and summaries based on verified facts and multiple reports where available.
+
+### Images
+
+Only publish images whose use is authorized, licensed, public-domain, legally reusable under an applicable exception/permission, or otherwise cleared by the project.
+
+An image appearing on a news website does **not** by itself establish permission to reuse it.
+
+If image rights are uncertain:
+
+```text
+DO NOT PUBLISH THE IMAGE
+        ↓
+USE A CLEARED VISUAL
+```
+
+Store available image provenance/rights metadata, including provider, original URL where appropriate, license/usage basis, acquisition time and rights status.
+
+AI-generated visuals may be used when appropriate, but must not be presented as authentic documentary photographs or evidence of an event.
 
 ---
 
-## Newspaper Edition
+## 12. Publication Editorial Notice
 
-AROUND THE MAIN is designed as a digital newspaper-style publication.
+A short notice may appear at the end of the publication, before the final footer:
 
-An edition may contain:
+> **Editorial Notice:** AROUND THE MAIN independently selects, verifies and summarizes information from multiple sources. Source attribution is provided for reference and transparency. Third-party names, trademarks, photographs and other protected materials remain the property of their respective owners. Attribution does not imply endorsement, affiliation or a license to reproduce third-party content.
 
-- multiple pages;
-- section headings;
-- article blocks;
+This notice is a transparency measure, **not a legal shield**. It does not replace licensing, rights clearance, legal review or compliance with applicable law.
+
+A full **Editorial & Content Policy** should be maintained on the project website before public/commercial launch.
+
+---
+
+## 13. Corrections / Rights Requests
+
+The production system should support a visible process for:
+
+- factual corrections;
+- source attribution corrections;
+- image-rights concerns;
+- rights-holder requests;
+- takedown requests;
+- editorial complaints.
+
+Corrections and requests should be traceable to Edition ID and story metadata where possible.
+
+---
+
+## 14. Mobile Edition
+
+Mobile Edition is a separate renderer of the same Edition Model.
+
+Every story card should contain:
+
+1. Image;
+2. Headline;
+3. Summary;
+4. Why It Matters;
+5. Sources.
+
+A story must never be split between pages.
+
+### Dynamic page density
+
+The number of pages and placement of cards must depend on actual story count and calculated card height.
+
+The renderer must:
+
+- minimize large unused areas;
+- fit as many appropriate stories as practical;
+- preserve story integrity;
+- adapt card height to content;
+- preserve image proportions;
+- maintain editorial hierarchy;
+- keep Page 01 branded;
+- keep later pages compact and consistent;
+- keep the footer consistent.
+
+The target is:
+
+> **HIGH INFORMATION DENSITY WITHOUT VISUAL CROWDING.**
+
+---
+
+## 15. Full Edition
+
+Full Edition is the digital newspaper presentation and may contain:
+
+- lead story;
+- main stories;
+- briefs;
 - photographs;
 - maps;
 - charts;
 - timelines;
 - infographics;
-- contextual information.
+- section headings;
+- date;
+- edition number;
+- page number;
+- footer.
 
-The number of pages is dynamic.
-
-There is no fixed page count.
-
-The system must prioritize editorial value, readability and hierarchy rather than artificial page filling.
-
----
-
-## Visual System
-
-Visual material must have editorial value.
-
-Possible visual formats include:
-
-- real photographs;
-- maps;
-- charts;
-- diagrams;
-- timelines;
-- data visualizations;
-- AI-generated illustrations where appropriate.
-
-AI-generated visuals must never be presented as documentary photographs or real evidence of an event.
+Page count is dynamic. Layout must prioritize editorial value, hierarchy and readability rather than artificial page filling.
 
 ---
 
-## Audio Edition
+## 16. Visual System
 
-A complete audio version of the edition is a mandatory part of the final publication.
+Established visual language:
 
-The Audio Edition is not merely a short headline summary.
-
-It should represent the complete published edition in coherent spoken form while preserving the editorial structure and meaning.
+- cream/paper background;
+- black primary text;
+- red accent;
+- strict international newspaper aesthetic;
+- high information density;
+- minimum decoration;
+- maximum useful news space.
 
 ---
 
-## Telegram Publication
+## 17. Audio Edition
 
-Current production channel:
+Audio is a presentation of the same edition, not a separate editorial selection.
 
-`@aroundthemain`
-
-The Telegram production path has been implemented and tested.
-
-Real Telegram delivery has been successfully verified.
-
-Idempotency has also been successfully verified.
-
-Example:
+Telegram publication order:
 
 ```text
-FIRST: SENT
-SECOND: SKIPPED
-```
-
-### Mandatory Publication Order
-
-The Telegram publication order is:
-
-```text
-🔊 AUDIO EDITION
+🎧 AUDIO EDITION
         ↓
 📰 TEXT / PRINTED EDITION
 ```
 
-The Audio Edition must appear above the printed/text version.
-
-Audio and text must belong to the same edition.
+Audio and text must use the same Edition ID.
 
 ---
 
-## Telegram Configuration
+## 18. Telegram
 
-Telegram credentials are provided only through environment variables:
+Production channel:
+
+```text
+@aroundthemain
+```
+
+`@WorldPulseDaily` is not a production destination.
+
+Credentials are provided only through environment variables:
 
 ```text
 TELEGRAM_BOT_TOKEN
 TELEGRAM_CHAT_ID
 ```
 
-Secrets must never be:
+Never commit or expose credentials in source code, README, tests, logs or screenshots.
 
-- committed to Git;
-- stored in source code;
-- printed in logs;
-- included in test fixtures;
-- exposed in screenshots.
+Production delivery must be idempotent: an already successfully delivered edition/channel combination is skipped rather than duplicated.
 
 ---
 
-## Autonomous Publication
+## 19. Event Memory
 
-After production launch, AROUND THE MAIN must operate without:
+Persistent Event Memory is required, with a target recent-memory horizon of approximately 30 days.
 
-- an open browser;
-- an active ChatGPT session;
-- an active Codespace;
-- the user's computer;
-- manual publication commands.
-
-The production scheduler must independently trigger the daily editions.
-
-The English-language schedule is:
-
-```text
-America/New_York
-
-07:00
-13:00
-20:00
-```
-
-The schedule must correctly handle EST/EDT daylight-saving transitions.
-
-Codespace is a development environment and must not be treated as the permanent production scheduler.
-
----
-
-## Edition ID
-
-Every production edition must have a stable Edition ID.
-
-The Edition ID must identify, at minimum:
-
-- publication date;
-- scheduled edition time;
-- language;
-- target channel;
-- edition instance.
-
-Conceptual example:
-
-```text
-AROUND-THE-MAIN-EN-2026-08-30-0700
-```
-
-The final technical implementation may define the exact format.
-
-Audio, text, visuals and delivery records belonging to the same edition must use the same Edition ID.
-
----
-
-## Persistent Event Memory
-
-AROUND THE MAIN requires persistent event memory.
-
-The target operational memory is approximately 30 days for recent events.
-
-The system must be able to recognize:
+It helps identify:
 
 - previously published events;
 - continuing stories;
 - new developments;
 - duplicate reports;
-- previously covered subjects.
+- previous coverage.
 
-Event memory must survive process restarts.
-
-Event Memory must not prevent a previously seen event from being evaluated again for a later Editorial Snapshot.
+It must not become a blanket ban on later editorial reconsideration.
 
 ---
 
-## Delivery Architecture
+## 20. Archive / Reproducibility
 
-The delivery system is separated into layers:
+Each edition should be reproducible. Persist, where available:
 
-```text
-Delivery Policy
-      ↓
-Delivery Log
-      ↓
-Delivery Executor
-      ↓
-Publisher Interface
-      ↓
-Channel Publisher
-      ↓
-Transport
-```
-
-The publisher must not make editorial decisions.
-
-The transport must not modify editorial content.
+- Edition ID;
+- publication date/time;
+- Editorial Snapshot time;
+- selected stories;
+- source metadata;
+- image rights/provenance metadata;
+- rendered outputs;
+- audio output;
+- QC result;
+- publication status;
+- delivery identifiers.
 
 ---
 
-## Idempotency
+## 21. Quality Control
 
-Idempotency is mandatory for production.
-
-The same edition/event must not be successfully delivered twice to the same channel.
-
-Conceptually:
-
-```text
-Same Edition/Event
-       +
-Same Channel
-       ↓
-Already SENT
-       ↓
-SKIPPED
-```
-
-Failed deliveries may be retried.
-
-Successful deliveries must not be duplicated after:
-
-- process restart;
-- scheduler duplication;
-- runner restart;
-- temporary network problems.
-
-Production delivery state must therefore be persistent.
-
----
-
-## Current Development Status
-
-The following components have been implemented and tested:
-
-- normalization;
-- fact extraction;
-- clustering;
-- verification;
-- intelligence;
-- ranking;
-- editorial decision;
-- content building;
-- publication building;
-- delivery policy;
-- delivery log;
-- delivery executor;
-- publisher interface;
-- Telegram configuration;
-- Telegram publisher;
-- Telegram HTTP transport;
-- Telegram publisher factory;
-- Telegram production runner;
-- production orchestrator;
-- edition slot resolution;
-- persistent Edition Memory;
-- persistent Event Memory;
-- edition-level Telegram delivery;
-- production edition delivery;
-- Editorial Snapshot timing passed through production execution.
-
-Latest recorded full regression:
-
-```text
-393 passed
-```
-
-Real Telegram delivery has been verified successfully with the production bot and channel configuration.
-
----
-
-## Production Work Remaining
-
-The major remaining production stages are:
-
-1. Production Source Registry expansion.
-2. Source Reputation implementation.
-3. Source Independence implementation.
-4. Editorial Snapshot eligibility based on information availability.
-5. `first_seen_at` / `last_updated_at` event-state tracking where source data permits it.
-6. Final editorial relevance and priority calibration for real-world news.
-7. Production Edition Builder hardening.
-8. Front Page Engine.
-9. Full dynamic Layout Engine.
-10. Production Visual Engine.
-11. Full Audio Edition generation.
-12. Audio Quality Control.
-13. Complete Audio + Text publication package.
-14. Hosted production deployment.
-15. Monitoring and alerting.
-16. Failure recovery.
-17. Controlled retry system.
-18. Complete end-to-end Quality Control.
-19. Full production rehearsal.
-20. Autonomous launch.
-
----
-
-## Production Scheduler
-
-The final scheduler must operate independently of the development environment.
-
-Required English-language schedule:
-
-```text
-Timezone: America/New_York
-
-07:00
-13:00
-20:00
-```
-
-The scheduler must:
-
-- trigger the correct edition;
-- establish the correct Editorial Snapshot Time;
-- prevent accidental duplicate execution;
-- support retries;
-- survive process restarts;
-- use the configured audience timezone;
-- operate without the user's computer.
-
----
-
-## Failure Recovery
-
-The production system must handle:
-
-- source/API failures;
-- network failures;
-- Telegram failures;
-- audio generation failures;
-- visual generation failures;
-- malformed data;
-- process restarts;
-- scheduler duplication;
-- partial delivery.
-
-Failures must be visible in production logs.
-
-The system must never silently report successful publication when publication failed.
-
----
-
-## Quality Control
-
-Before publication, the complete edition must pass Quality Control.
-
-QC must cover, where applicable:
+Before publication verify:
 
 ### Editorial
-
 - factual accuracy;
 - source quality;
-- verification;
+- source independence where claimed;
+- event clustering;
 - duplicate detection;
-- editorial decision validity;
-- correct Editorial Snapshot eligibility.
+- geographic coverage;
+- relevance and publishability.
 
 ### Content
-
-- correct headlines;
-- correct summaries;
-- correct sources;
-- correct section assignment.
+- original headline;
+- accurate summary;
+- Why It Matters;
+- correct attribution;
+- correct section.
 
 ### Layout
-
-- valid page structure;
-- readability;
 - no broken blocks;
-- correct hierarchy.
+- no unintended large empty areas;
+- readable typography;
+- correct page numbering;
+- correct edition/date;
+- correct image proportions.
 
-### Visual
-
-- correct event association;
-- appropriate visual type;
-- no misleading documentary presentation.
-
-### Audio
-
-- correct edition;
-- correct language;
-- complete audio;
-- valid file;
-- acceptable quality.
+### Rights
+- image provenance recorded;
+- usage status known;
+- unresolved rights do not silently pass publication.
 
 ### Delivery
-
 - correct Edition ID;
 - correct channel;
-- idempotency readiness;
-- publication package consistency.
+- correct order;
+- consistent package metadata;
+- idempotency readiness.
 
 ---
 
-## Monitoring
+## 22. Autonomous Production
 
-Production monitoring must eventually provide visibility into:
+After launch, production must operate without an open browser, active ChatGPT session, active Codespace, user's computer or manual publication commands.
 
-- edition start;
-- edition completion;
-- Editorial Snapshot Time;
-- article collection;
-- event count;
-- selected stories;
-- QC result;
-- audio generation;
-- delivery;
-- Telegram message IDs;
-- failures;
-- retries.
+Codespace is a development environment, not the permanent scheduler.
 
-Secrets must never appear in logs.
-
----
-
-## Production Safety
-
-Development and production must remain clearly separated.
-
-The following operations must not automatically publish real Telegram messages:
-
-- unit tests;
-- syntax checks;
-- mock publisher tests;
-- local experiments;
-- ordinary development scripts.
-
-Real publication must use an explicit production path.
-
----
-
-## Development Roadmap
-
-### Phase 1 — Persistent State
-
-- SQLite delivery database;
-- persistent delivery records;
-- Edition ID;
-- persistent event memory.
-
-### Phase 2 — Editorial Intelligence
-
-- Source Registry;
-- Source Reputation;
-- Source Independence;
-- Editorial Snapshot eligibility;
-- `first_seen_at` / `last_updated_at` tracking;
-- improved editorial priority.
-
-### Phase 3 — Edition Construction
-
-- Edition Builder;
-- Front Page Engine;
-- dynamic Layout Engine.
-
-### Phase 4 — Visual System
-
-- visual decision logic;
-- maps;
-- charts;
-- timelines;
-- illustrations;
-- AI visual safeguards.
-
-### Phase 5 — Audio
-
-- complete edition audio generation;
-- audio formatting;
-- audio Quality Control;
-- Telegram audio delivery.
-
-### Phase 6 — Publication Package
-
-Integrate:
-
-```text
-Edition ID
-+
-Editorial Snapshot
-+
-Text
-+
-Pages
-+
-Visuals
-+
-Audio
-+
-Quality Control
-+
-Delivery Metadata
-```
-
-### Phase 7 — Autonomous Runner
-
-Create a production-safe command capable of:
-
-- building one edition;
-- collecting current source information;
-- validating the Editorial Snapshot;
-- generating the publication package;
-- delivering it;
-- recording persistent state.
-
-### Phase 8 — Scheduler
-
-Implement:
+Required schedule:
 
 ```text
 America/New_York
-
 07:00
 13:00
 20:00
 ```
 
-The scheduler must be hosted independently of Codespace and the user's computer.
+EST/EDT daylight-saving transitions must be handled correctly.
 
-### Phase 9 — Production Hardening
+---
 
-Implement:
+## 23. Production Readiness Gates
 
-- monitoring;
-- alerts;
-- failure recovery;
-- retries;
-- persistent logging;
-- operational safeguards.
+Autonomous public launch requires:
 
-### Phase 10 — Final Rehearsal
+1. broad active source registry;
+2. source health monitoring;
+3. candidate collection at intended scale;
+4. geographic coverage metrics;
+5. independent event clustering/verification;
+6. final story-volume control;
+7. dynamic page-density control;
+8. rights-aware image handling;
+9. source attribution;
+10. corrections/rights-request procedure;
+11. consistent Full/Mobile/Audio package;
+12. Telegram idempotency;
+13. hosted scheduler;
+14. monitoring and alerting;
+15. failure recovery and controlled retries;
+16. end-to-end rehearsal.
 
-Run a complete end-to-end production rehearsal:
+---
+
+## 24. Implementation Priority
 
 ```text
-Collection
-↓
-Editorial Snapshot
-↓
-Verification
-↓
-Editorial
-↓
-Edition
-↓
-Visuals
-↓
-Audio
-↓
-Quality Control
-↓
-Telegram Audio
-↓
-Telegram Text
-↓
-Persistent Delivery State
+1. SOURCE NETWORK EXPANSION
+2. GLOBAL COVERAGE ENGINE
+3. EDITORIAL VOLUME / SELECTION
+4. DYNAMIC PAGE PLANNING
+5. RIGHTS-AWARE CONTENT + IMAGE PROVENANCE
+6. FULL / MOBILE / AUDIO HARDENING
+7. END-TO-END QC
+8. HOSTED AUTONOMOUS PRODUCTION
 ```
 
-The rehearsal must also verify:
-
-- restart safety;
-- duplicate scheduler safety;
-- timezone behavior;
-- all three daily schedules;
-- information cutoff behavior;
-- late-arriving information behavior;
-- independent editorial selection for each edition.
-
-### Phase 11 — Autonomous Launch
-
-Autonomous publication is activated only after the final production rehearsal succeeds.
+Do not optimize decorative layout before source, editorial and page-planning layers are stable.
 
 ---
 
-## Master Technical Specification
-
-The complete and controlling technical specification is:
-
-[WORLD_PULSE_FINAL_TZ_v1.1.md](WORLD_PULSE_FINAL_TZ_v1.1.md)
-
-The master specification contains the complete architectural, editorial, publication, delivery and production requirements.
-
-Important production decisions must be reflected in the master specification rather than existing only in chat history.
-
----
-
-## Production Completion
-
-AROUND THE MAIN is considered production-complete only when:
-
-- the complete pipeline runs successfully;
-- news is collected and verified;
-- each edition is built from a fresh Editorial Snapshot;
-- information eligibility is evaluated against the edition snapshot;
-- editorial selection succeeds;
-- the edition is built;
-- visuals are valid;
-- the complete Audio Edition is generated;
-- audio QC passes;
-- the text/printed edition is generated;
-- Audio is published before Text;
-- persistent delivery state is recorded;
-- duplicate delivery is prevented;
-- failed deliveries can be safely retried;
-- the scheduler operates independently of the user's computer;
-- the English channel operates at 07:00, 13:00 and 20:00 `America/New_York`;
-- monitoring is operational;
-- failure recovery is operational;
-- the complete end-to-end rehearsal succeeds.
-
-Only after these requirements are satisfied may autonomous production be activated.
-
----
-
-## Version
-
-Current master specification:
+## 25. Canonical Rule
 
 ```text
-WORLD_PULSE_FINAL_TZ_v1.1.md
+ONE EDITION
+      ↓
+ONE EDITORIAL SELECTION
+      ↓
+FULL + MOBILE + AUDIO
+      ↓
+ONE EDITION ID
+      ↓
+TELEGRAM @aroundthemain
 ```
 
-The original v1.0 specification remains the historical source document.
-
-Future approved architectural or product decisions must be reflected in the master specification and documented in the project changelog.
+**Production goal:** a dense, accurate and internationally representative snapshot of the world — three times a day.
 
 ---
 
-## Project Principle
+## 26. Current Development Focus
 
-> **MINIMUM TEXT. MAXIMUM MEANING.**
+The current implementation work is focused on:
 
-> **VERIFIED FACTS. CLEAR SOURCES. NO AUTOMATED OPINION.**
+- expanding the production source registry;
+- maximizing meaningful country/region coverage;
+- producing a sufficiently rich candidate pool;
+- selecting approximately 12–16 strong stories per normal edition;
+- dynamically filling mobile pages to avoid large empty areas;
+- preserving story integrity between pages;
+- implementing rights-aware source/image handling;
+- maintaining the existing Telegram/audio/full/mobile architecture.
 
-## Mobile Edition Layout
+The repository must not claim global coverage until the source registry actually provides broad functioning coverage.
 
-Mobile Edition is a paginated presentation of one Edition.
+---
 
-### Page 01
+## 27. Canonical Files
 
-Page 01 uses the unified branded header image:
+- `AROUND_THE_MAIN_TZ_v1.3.md` — current controlling technical specification;
+- `AROUND_THE_MAIN_TZ_v1.2.txt` — previous working specification retained for history;
+- `README.md` — project overview and operational rules.
 
-assets/mobile-header.png
-
-The separate logo.png is not rendered in the mobile header.
-
-Page 01 contains:
-- branded header;
-- edition number;
-- publication date;
-- edition name;
-- PAGE 01;
-- edition content;
-- DAILY BRIEF footer.
-
-### Pages 02+
-
-Pages 02 and later do not repeat the branded header image.
-
-They use a compact top line with:
-- edition name on the left;
-- PAGE XX on the right;
-- horizontal divider below.
-
-The content follows below the compact header.
-
-### Edition Names
-
-The supported editions are:
-
-- Morning Briefing
-- Midday Update
-- Evening Round-up
-
-The appropriate edition name is displayed according to the active Edition.
-
-### Page Numbers
-
-Page numbers are generated dynamically:
-
-PAGE 01
-PAGE 02
-PAGE 03
-...
-
-Each rendered page receives its own page_number.
-
-### Footer
-
-Every Mobile Edition page uses the same DAILY BRIEF footer.
-
-The footer contains:
-- DAILY BRIEF;
-- The most important stories, delivered in brief.;
-- GLOBAL NEWS • AROUND THE MAIN;
-- Telegram @aroundthemain;
-- X @aroundthemain;
-- STAY INFORMED. STAY AHEAD.
-
-### Visual System
-
-All pages of one edition use the same visual system:
-
-- newspaper-style cream/paper background;
-- black typography;
-- red accent;
-- consistent dividers and section bars;
-- consistent footer;
-- consistent typography and spacing.
-
-The first page provides the full brand presentation. Subsequent pages use a clean compact layout while remaining visually connected to Page 01.
-
-ONE EDITION → MULTIPLE PAGES → ONE CONSISTENT VISUAL SYSTEM
+**Version:** v1.3  
+**Architecture:** ONE EDITION → MULTIPLE PRESENTATIONS  
+**Telegram:** `@aroundthemain`
