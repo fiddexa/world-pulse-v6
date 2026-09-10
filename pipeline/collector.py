@@ -1,3 +1,4 @@
+import re
 import gzip
 
 from datetime import datetime, timezone

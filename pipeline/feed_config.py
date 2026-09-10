@@ -21,7 +21,16 @@ FEED_REGISTRY = {
 
     "associated_press": [],
 
-    "bbc": [],
+    "bbc": [
+        {
+            "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+            "source": "BBC",
+            "name": "BBC World",
+            "type": "rss",
+            "requires_auth": False,
+            "category": "world",
+        },
+    ],
 
     "afp": [],
 
@@ -39,6 +48,39 @@ FEED_REGISTRY = {
         },
     ],
 
+    "dw": [
+        {
+            "url": "https://rss.dw.com/rdf/rss-en-world",
+            "source": "DW",
+            "name": "DW World",
+            "type": "rss",
+            "requires_auth": False,
+            "category": "world",
+        },
+    ],
+
+    "euronews": [
+        {
+            "url": "https://www.euronews.com/rss",
+            "source": "Euronews",
+            "name": "Euronews",
+            "type": "rss",
+            "requires_auth": False,
+            "category": "world",
+        },
+    ],
+
+    "africanews": [
+        {
+            "url": "https://www.africanews.com/feed/",
+            "source": "Africanews",
+            "name": "Africanews",
+            "type": "rss",
+            "requires_auth": False,
+            "category": "world",
+        },
+    ],
+
     "imf": [],
 
     "world_bank": [],
@@ -49,50 +91,6 @@ FEED_REGISTRY = {
 
     "opec": [],
 }
-
-CONNECTOR_REGISTRY = {
-    "reuters": {
-        "type": "licensed",
-        "enabled": False,
-    },
-    "associated_press": {
-        "type": "api",
-        "enabled": False,
-    },
-    "bbc": {
-        "type": "licensed",
-        "enabled": False,
-    },
-    "afp": {
-        "type": "licensed",
-        "enabled": False,
-    },
-    "un": {
-        "type": "rss",
-        "enabled": True,
-    },
-    "imf": {
-        "type": "rss",
-        "enabled": False,
-    },
-    "world_bank": {
-        "type": "api",
-        "enabled": False,
-    },
-    "who": {
-        "type": "rss",
-        "enabled": False,
-    },
-    "iea": {
-        "type": "rss",
-        "enabled": False,
-    },
-    "opec": {
-        "type": "rss",
-        "enabled": False,
-    },
-}
-
 
 def get_connector_config(source=None):
     """

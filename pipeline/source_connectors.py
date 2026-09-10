@@ -136,10 +136,54 @@ class RSSConnector(SourceConnector):
         if not self.enabled or not self.feeds:
             return []
 
-        articles = self.collector(
-            self.feeds,
-            timeout=self.timeout,
-        )
+        articles = []
+
+        for feed in self.feeds:
+            if not isinstance(feed, dict):
+                continue
+
+            feed_url = str(
+                feed.get("url") or ""
+            ).strip()
+
+            if not feed_url:
+                continue
+
+            source = str(
+                feed.get("source") or self.source
+            ).strip() or self.source
+
+            try:
+                result = self.collector(
+                    feed_url,
+                    source=source,
+                    timeout=self.timeout,
+                )
+            except TypeError as exc:
+                # The canonical collector.collect() accepts a feed
+                # definition/list, not source= as a keyword.
+                # Retry only for that interface mismatch.
+                message = str(exc)
+
+                if "unexpected keyword argument 'source'" not in message:
+                    raise
+
+                result = self.collector(
+                    [
+                        {
+                            "url": feed_url,
+                            "source": source,
+                        }
+                    ],
+                    timeout=self.timeout,
+                )
+
+            if isinstance(result, list):
+                articles.extend(
+                    article
+                    for article in result
+                    if isinstance(article, dict)
+                )
 
         return [
             normalize_connector_article(

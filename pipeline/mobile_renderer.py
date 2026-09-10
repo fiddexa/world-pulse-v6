@@ -28,7 +28,7 @@ NEWSPAPER = (243, 233, 216)
 
 WIDTH = 900
 MARGIN = 36
-CARD_GAP = 28
+CARD_GAP = 21
 
 # Mobile Telegram page.
 # Cards are never split between pages.
@@ -43,27 +43,27 @@ X_LOGO_PATH = Path("assets/x/logo-black.png")
 # =====================================================================
 
 def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    candidates = []
-
     if bold:
-        candidates.extend(
-            [
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
-            ]
-        )
+        font_path = "/usr/share/fonts/opentype/inter/Inter-Bold.otf"
     else:
-        candidates.extend(
-            [
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
-            ]
-        )
+        font_path = "/usr/share/fonts/opentype/inter/Inter-Regular.otf"
 
-    for candidate in candidates:
-        path = Path(candidate)
-        if path.exists():
-            return ImageFont.truetype(str(path), size)
+    path = Path(font_path)
+
+    if path.exists():
+        return ImageFont.truetype(str(path), size)
+
+    # Fallback if Inter is unavailable.
+    fallback = (
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        if bold
+        else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    )
+
+    fallback_path = Path(fallback)
+
+    if fallback_path.exists():
+        return ImageFont.truetype(str(fallback_path), size)
 
     return ImageFont.load_default()
 
@@ -206,106 +206,12 @@ def _sources(event: dict) -> list[str]:
 
 
 def _image_path(event: dict) -> Path | None:
-    for key in (
-        "image_path",
-        "local_image",
-        "image",
-        "photo_path",
-    ):
-        value = event.get(key)
+    """
+    News photography is intentionally disabled.
 
-        if not value:
-            continue
-
-        path = Path(str(value))
-
-        if path.exists() and path.is_file():
-            return path
-
-    content = event.get("content")
-
-    image_url = event.get("image_url")
-
-    if not image_url and isinstance(content, dict):
-        image_url = content.get("image_url")
-
-    if not image_url:
-        for article in _list(event.get("articles")):
-            if isinstance(article, dict):
-                image_url = article.get("image_url")
-                if image_url:
-                    break
-
-    if not image_url:
-        return None
-
-    image_url = _safe_text(image_url)
-
-    try:
-        parsed = urlparse(image_url)
-
-        if parsed.scheme not in {"http", "https"}:
-            return None
-
-        hostname = (parsed.hostname or "").lower()
-
-        # Only allow the trusted UN media host for automatic
-        # production image caching.
-        if not hostname.endswith("unitednations.entermediadb.net"):
-            return None
-
-        cache_dir = Path("data/images")
-        cache_dir.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        extension = ".jpg"
-
-        path_name = Path(parsed.path).name.lower()
-
-        for candidate in (".jpg", ".jpeg", ".png", ".webp"):
-            if candidate in path_name:
-                extension = candidate
-                break
-
-        digest = hashlib.sha256(
-            image_url.encode("utf-8")
-        ).hexdigest()[:20]
-
-        local_path = cache_dir / f"{digest}{extension}"
-
-        if local_path.exists() and local_path.stat().st_size > 0:
-            return local_path
-
-        request = Request(
-            image_url,
-            headers={
-                "User-Agent": "AroundTheMain/1.0",
-                "Accept": "image/avif,image/webp,image/jpeg,image/png,*/*",
-            },
-        )
-
-        with urlopen(
-            request,
-            timeout=15,
-        ) as response:
-            data = response.read()
-
-        if not data:
-            return None
-
-        local_path.write_bytes(data)
-
-        # Validate that the downloaded file is a real image.
-        with Image.open(local_path) as check:
-            check.verify()
-
-        return local_path
-
-    except Exception:
-        return None
-
+    Mobile uses a text-first editorial format.
+    """
+    return None
 
 def _has_real_image(event: dict) -> bool:
     return _image_path(event) is not None
@@ -508,6 +414,34 @@ def _collect_events(edition: dict) -> list[dict]:
 
     seen = set()
 
+    mobile_audio = edition.get("mobile_audio")
+
+    if isinstance(mobile_audio, dict):
+        top = mobile_audio.get("top_story")
+
+        if isinstance(top, dict):
+            result.append(top)
+            seen.add(id(top))
+
+        for key in (
+            "main_stories",
+            "briefs",
+            "events",
+        ):
+            for event in _list(
+                mobile_audio.get(key)
+            ):
+                if not isinstance(event, dict):
+                    continue
+
+                if id(event) in seen:
+                    continue
+
+                result.append(event)
+                seen.add(id(event))
+
+        return result
+
     top = edition.get("top_story")
 
     if isinstance(top, dict):
@@ -665,10 +599,10 @@ def _card_height(
     *,
     compact: bool = False,
 ) -> int:
-    """Calculate the rendered height of a split-layout news card."""
+    """Calculate a content-driven mobile news-card height."""
 
     if not isinstance(event, dict):
-        return 180 if compact else 230
+        return 165 if compact else 285
 
     probe = Image.new(
         "RGB",
@@ -677,99 +611,110 @@ def _card_height(
     )
     probe_draw = ImageDraw.Draw(probe)
 
-    # Card is split into text (left) and image (right).
-    # Keep a comfortable text column while giving the image real visual weight.
     card_inner_width = WIDTH - MARGIN * 2 - 32
-    image_width = 330
-    text_width = card_inner_width - image_width - 24
+    has_image = _has_real_image(event)
 
     if compact:
+        image_width = 245
+        image_gap = 18
         title_font = _font(20, bold=True)
-        summary_font = _font(13)
-        title_max_lines = 2
-        summary_max_lines = 2
-        min_height = 175
+        summary_font = _font(14)
+        title_max_lines = 3
+        summary_max_lines = 3
+        title_spacing = 4
+        summary_spacing = 5
+        min_height = 165
+        max_height = 265
     else:
+        image_width = 285
+        image_gap = 18
         title_font = _font(30, bold=True)
         summary_font = _font(18)
         title_max_lines = 5
         summary_max_lines = 5
-        min_height = 320
+        title_spacing = 5
+        summary_spacing = 6
+        min_height = 285
+        max_height = 390
+
+    text_width = (
+        card_inner_width - image_width - image_gap
+        if has_image
+        else card_inner_width
+    )
+
+    title = _title(event)
+    summary = _summary(event)
 
     title_lines = _wrap(
         probe_draw,
-        _title(event),
+        title,
         title_font,
         text_width,
     )[:title_max_lines]
 
-    title_line_height = (
-        title_font.getbbox("Ag")[3]
-        - title_font.getbbox("Ag")[1]
-        + (4 if compact else 5)
-    )
-
-    summary = _summary(event)
-    summary_lines = []
-
-    if summary:
-        summary_lines = _wrap(
+    summary_lines = (
+        _wrap(
             probe_draw,
             summary,
             summary_font,
             text_width,
         )[:summary_max_lines]
+        if summary
+        else []
+    )
+
+    title_line_height = (
+        title_font.getbbox("Ag")[3]
+        - title_font.getbbox("Ag")[1]
+        + title_spacing
+    )
 
     summary_line_height = (
         summary_font.getbbox("Ag")[3]
         - summary_font.getbbox("Ag")[1]
-        + (4 if compact else 5)
+        + summary_spacing
     )
 
-    sources = _sources(event)
-    source_lines = []
+    height = 35 + 18
 
-    if sources:
-        source_text = "  •  ".join(sources[:3])
-        source_lines = _wrap(
-            probe_draw,
-            source_text,
-            _font(11),
-            max(1, text_width - 55),
-        )[:2]
-
-    source_line_height = (
-        _font(11).getbbox("Ag")[3]
-        - _font(11).getbbox("Ag")[1]
-        + 2
-    )
-
-    # Header band + vertical padding.
-    height = 35 + 24
-
-    if title_lines:
-        height += len(title_lines) * title_line_height + (
-            8 if compact else 12
-        )
+    height += len(title_lines) * title_line_height
 
     if summary_lines:
-        height += len(summary_lines) * summary_line_height + (
-            7 if compact else 12
+        height += 7
+        height += len(summary_lines) * summary_line_height
+
+    if has_image:
+        summary_count = len(summary_lines)
+
+        if compact:
+            image_height = (
+                105 if summary_count <= 1
+                else 125 if summary_count == 2
+                else 145
+            )
+        else:
+            image_height = (
+                145 if summary_count <= 1
+                else 175 if summary_count == 2
+                else 205
+            )
+
+        height = max(
+            height,
+            35 + image_height + 18,
         )
 
-    if source_lines:
-        height += max(
-            15 if compact else 18,
-            len(source_lines) * source_line_height,
-        ) + 7
+    if _sources(event):
+        # SOURCE is bottom-anchored during rendering, so its complete
+        # vertical footprint must be part of the final card height.
+        source_reserve = 58
+        height += source_reserve
 
-    # The right-hand image needs enough height to look substantial.
-    if _has_real_image(event):
-        height = max(height, 35 + (155 if compact else 250) + 24)
-    else:
-        height = max(height, min_height)
-
-    return max(min_height, min(430, height))
+    return max(
+        min_height,
+        min(max_height, height),
+    )
 
 def render_mobile_edition(
     edition: dict,
@@ -803,32 +748,51 @@ def render_mobile_edition(
 
     header_height = 300
     footer_height = 300
+    red_bar_height = 28
 
-    # PAGE 01: full branded header + edition information.
-    # PAGES 02+: compact header.
-    # Keep enough space for the full header, edition/date/page row,
-    # and divider before the first story.
+    # PAGE 01: full branded header + full footer.
+    # PAGES 02+: compact header + bottom red stripe only.
+    # Each page uses the real vertical space available to its layout.
     content_top_first = header_height - 61
     content_top_other = MARGIN + 50
 
-    content_bottom = (
-    MOBILE_PAGE_HEIGHT
-    - footer_height
-    - MARGIN
+    # PAGE 01 keeps a small controlled breathing room before
+    # MARKETS TODAY while allowing additional compact stories.
+    content_bottom_first = 930
+
+    content_bottom_other = (
+        MOBILE_PAGE_HEIGHT
+        - red_bar_height
+        - MARGIN
     )
 
-    available_first = content_bottom - content_top_first
-    available_other = content_bottom - content_top_other
+    available_first = (
+        content_bottom_first
+        - content_top_first
+    )
+
+    available_other = (
+        content_bottom_other
+        - content_top_other
+    )
 
     # A page with no stories is still a valid mobile edition.
+    #
+    # Unified adaptive pagination:
+    # - the same packing logic is used on PAGE 01 and later pages;
+    # - a story uses its actual content-driven height;
+    # - there is no artificial "maximum two stories" rule;
+    # - the first story remains the lead presentation, but pagination
+    #   is still governed by available vertical space.
+
     pages: list[list[dict]] = []
 
     current_page: list[dict] = []
     current_height = 0
 
     for event_index, event in enumerate(events):
-        # Story 01 is the lead story.
-        # All following stories use compact cards.
+        # Story 01 remains the lead story.
+        # All following stories use the compact card treatment.
         compact = event_index > 0
 
         event_height = _card_height(
@@ -836,44 +800,32 @@ def render_mobile_edition(
             compact=compact,
         )
 
-        required = event_height
+        required_height = event_height
 
         if current_page:
-            required += CARD_GAP
+            required_height += CARD_GAP
 
-        available = (
+        available_height = (
             available_first
             if not pages
             else available_other
         )
 
-        # Keep the lead story large, then allow compact stories
-        # to fill the remaining space on Page 01.
+        # If the story does not fit, close the current page
+        # and start a new one.
         if (
             current_page
-            and current_height + required > available
+            and current_height + required_height > available_height
         ):
             pages.append(current_page)
-            current_page = []
-            current_height = 0
-            required = event_height
-            available = available_other
 
-        # On pages after the first, keep the existing compact-card
-        # limit of two stories per page.
-        if (
-            pages
-            and compact
-            and len(current_page) >= 2
-        ):
-            pages.append(current_page)
             current_page = []
             current_height = 0
-            required = event_height
-            available = available_other
+            required_height = event_height
+            available_height = available_other
 
         current_page.append(event)
-        current_height += required
+        current_height += required_height
 
     if current_page:
         pages.append(current_page)
@@ -939,9 +891,23 @@ def render_mobile_edition(
                         briefing_bbox[2] - briefing_bbox[0]
                     )
 
+                    # Center MORNING BRIEFING inside the open gap
+                    # between the two interrupted top header lines.
+                    gap_left = 624
+                    gap_right = 814
+
+                    briefing_x = (
+                        gap_left
+                        + (
+                            gap_right
+                            - gap_left
+                            - briefing_width
+                        ) // 2
+                    )
+
                     draw.text(
                         (
-                            WIDTH - briefing_width - 109,
+                            briefing_x,
                             32,
                         ),
                         briefing,
@@ -1382,8 +1348,29 @@ def render_mobile_edition(
         
         if page_number == 1:
             y = content_top_first
+            page_available_height = available_first
         else:
             y = content_top_other
+            page_available_height = available_other
+
+        base_heights = []
+
+        for event_index, event in enumerate(page_events):
+            compact = (
+                sum(
+                    len(previous_page)
+                    for previous_page in pages[: page_number - 1]
+                )
+                + event_index
+                > 0
+            )
+
+            base_heights.append(
+                _card_height(
+                    event,
+                    compact=compact,
+                )
+            )
 
         for index, event in enumerate(page_events):
             story_number = sum(
@@ -1393,10 +1380,9 @@ def render_mobile_edition(
 
             compact = story_number > 1
 
-            card_height = _card_height(
-                event,
-                compact=compact,
-            )
+            # Use the content-driven height directly.
+            # Do not stretch short stories to fill the page.
+            card_height = base_heights[index]
 
             card_top = y
             card_bottom = y + card_height
@@ -1465,7 +1451,7 @@ def render_mobile_edition(
                 title_font = _font(20, bold=True)
                 title_max_lines = 2
                 title_spacing = 4
-                summary_font = _font(13)
+                summary_font = _font(18)
                 summary_max_lines = 2
                 summary_spacing = 4
                 image_title_gap = 10
@@ -1474,7 +1460,7 @@ def render_mobile_edition(
                 summary_source_gap = 7
             else:
                 image_height = 180
-                title_font = _font(30, bold=True)
+                title_font = _font(20, bold=True)
                 title_max_lines = 4
                 title_spacing = 5
                 summary_font = _font(18)
@@ -1493,8 +1479,8 @@ def render_mobile_edition(
             card_inner_right = WIDTH - MARGIN - 16
             card_inner_top = card_top + 50
 
-            image_width = 330
-            image_gap = 24
+            image_width = 245 if compact else 285
+            image_gap = 18
 
             image_left = (
                 card_inner_right
@@ -1502,21 +1488,49 @@ def render_mobile_edition(
             )
 
             text_x = card_inner_left
-            text_width = (
-                image_left
-                - image_gap
-                - text_x
-            )
 
-            if compact:
-                image_height = min(
-                    155,
-                    card_height - 58,
+            # No photo -> use the entire card width.
+            # Photo -> reserve the right column.
+            if has_image:
+                text_width = (
+                    image_left
+                    - image_gap
+                    - text_x
                 )
             else:
+                text_width = (
+                    card_inner_right
+                    - text_x
+                )
+
+            if has_image:
+                summary_probe = _wrap(
+                    draw,
+                    _summary(event),
+                    _font(14 if compact else 18),
+                    max(1, text_width),
+                )
+
+                summary_count = len(
+                    summary_probe[:3 if compact else 5]
+                )
+
+                if compact:
+                    image_height = (
+                        105 if summary_count <= 1
+                        else 125 if summary_count == 2
+                        else 145
+                    )
+                else:
+                    image_height = (
+                        145 if summary_count <= 1
+                        else 175 if summary_count == 2
+                        else 205
+                    )
+
                 image_height = min(
-                    250,
-                    card_height - 58,
+                    image_height,
+                    max(1, card_height - 58),
                 )
 
             if has_image:
@@ -1570,18 +1584,6 @@ def render_mobile_edition(
             sources = _sources(event)
 
             if sources:
-                sources_y = current_y
-
-                draw.text(
-                    (
-                        text_x,
-                        sources_y,
-                    ),
-                    "SOURCE",
-                    font=_font(11, bold=True),
-                    fill=RED,
-                )
-
                 normalized_sources = []
 
                 for source in sources[:3]:
@@ -1607,14 +1609,62 @@ def render_mobile_edition(
                     normalized_sources
                 )
 
+                # -----------------------------------------------------
+                # SOURCE BLOCK — anchored to the bottom of the card.
+                # -----------------------------------------------------
+                source_font = _font(11)
+
+                source_lines = _wrap(
+                    draw,
+                    source_text,
+                    source_font,
+                    text_width,
+                )[:2]
+
+                source_line_height = (
+                    source_font.getbbox("Ag")[3]
+                    - source_font.getbbox("Ag")[1]
+                    + 2
+                )
+
+                source_gap = 4
+                source_bottom_padding = 10
+
+                source_text_height = (
+                    max(1, len(source_lines))
+                    * source_line_height
+                )
+
+                source_block_height = (
+                    11 + source_gap + source_text_height
+                )
+
+                sources_y = (
+                    card_bottom
+                    - source_bottom_padding
+                    - source_block_height
+                )
+
+                # SOURCE label.
+                draw.text(
+                    (
+                        text_x,
+                        sources_y,
+                    ),
+                    "SOURCE",
+                    font=_font(11, bold=True),
+                    fill=RED,
+                )
+
+                # Source name.
                 _draw_wrapped(
                     draw,
                     source_text,
-                    text_x + 55,
-                    sources_y - 2,
-                    _font(11),
+                    text_x,
+                    sources_y + 11 + source_gap,
+                    source_font,
                     GRAY,
-                    text_width - 55,
+                    text_width,
                     max_lines=2,
                     spacing=2,
                 )
@@ -1627,7 +1677,9 @@ def render_mobile_edition(
 
         if page_number == 1:
 
-            markets_y = MOBILE_PAGE_HEIGHT - footer_height + 30
+            # Keep MARKETS TODAY closer to the footer so more
+            # vertical space remains available for news cards.
+            markets_y = MOBILE_PAGE_HEIGHT - footer_height + 50
 
             draw_markets_today(
                 canvas,

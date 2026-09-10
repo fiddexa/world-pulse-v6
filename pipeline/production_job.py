@@ -236,6 +236,12 @@ def run_test_production_job(
         edition.get("edition_id") or ""
     ).strip()
 
+    # Preserve the explicit publication date inside the edition
+    # so downstream renderers can display it dynamically.
+    edition["publication_date"] = str(
+        publication_date
+    )
+
     edition_year = int(
         str(publication_date)[:4]
     )
