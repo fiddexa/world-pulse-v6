@@ -327,7 +327,18 @@ USE A CLEARED VISUAL
 
 Store available image provenance/rights metadata, including provider, original URL where appropriate, license/usage basis, acquisition time and rights status.
 
-AI-generated visuals may be used when appropriate, but must not be presented as authentic documentary photographs or evidence of an event.
+### AI-generated visual standard
+
+AROUND THE MAIN uses AI-generated editorial visuals as the default visual format for selected news stories.
+
+Each selected story should receive one dedicated visual based on its verified headline, summary, facts, entities and location.
+
+The same image asset must be reused by Full, Mobile and Telegram.
+
+The `AROUND THE MAIN` brand mark is added programmatically by the renderer for consistent spelling, size and placement.
+
+AI visuals are editorial illustrations and must never be presented as authentic documentary photographs or evidence of an event.
+
 
 ---
 
@@ -648,3 +659,130 @@ The repository must not claim global coverage until the source registry actually
 **Version:** v1.3  
 **Architecture:** ONE EDITION → MULTIPLE PRESENTATIONS  
 **Telegram:** `@aroundthemain`
+
+## CURRENT PRODUCTION STATUS — SEPTEMBER 2026
+
+### Production presentation standard
+
+AROUND THE MAIN currently uses a text-first news presentation.
+
+Production news stories contain:
+
+- category;
+- headline;
+- concise summary;
+- source attribution.
+
+Editorial photographs and AI-generated story images are disabled in the production execution path.
+
+The AI visual module may remain in the repository as an experimental component, but it is not a production dependency and must never delay, block or fail an edition.
+
+### Presentation architecture
+
+ONE EDITION produces:
+
+FULL + MOBILE + AUDIO
+
+All three presentations use the same Edition Model, Edition ID, editorial selection and source metadata.
+
+### Full Edition visual standard
+
+All Full Edition news pages use the same text-first newspaper language:
+
+CATEGORY
+HEADLINE
+SUMMARY
+SOURCE
+
+The existing masthead/header and footer remain part of the publication design.
+
+Page 01 follows the same text-first news-feed principle as the later Full Edition pages. The existing market information area remains part of Page 01.
+
+### Mobile visual standard
+
+Mobile uses the same Edition Model and is optimized for smartphone reading and Telegram.
+
+Current production Mobile news cards are text-first:
+
+HEADLINE
+SUMMARY
+WHY IT MATTERS where available
+SOURCES
+
+Stories must never be split between pages.
+
+### Audio
+
+Audio remains an official presentation of the same Edition Model.
+
+Audio and text belong to the same Edition ID.
+
+Telegram production order remains:
+
+AUDIO
+↓
+TEXT / PRINTED
+
+### Last-page branding
+
+The final Full Edition page may contain an additional AROUND THE MAIN branding and information-rights block when sufficient empty space remains.
+
+Current adaptive threshold:
+
+< 25% free space  -> no block
+25–40%            -> COMPACT
+40–55%            -> STANDARD
+> 55%             -> LARGE
+
+The block uses:
+
+assets/around_the_main_last_page_3x1.png
+
+The asset is a transparent 3:1 PNG.
+
+The block may contain:
+
+AROUND THE MAIN
+More than news. A wider perspective.
+INFORMATION & RIGHTS POLICY
+
+The block must never displace, compress, remove or reorder published stories.
+
+The existing header and footer remain unchanged.
+
+### Information & Rights Policy
+
+The publication may use the following transparency language:
+
+INFORMATION & RIGHTS POLICY
+
+We gather information from publicly available and reputable news sources, then independently edit and summarize it for clarity, context and informational purposes. We respect intellectual property rights and do not claim ownership of third-party materials.
+
+Trademarks, logos, photographs and other protected materials remain the property of their respective owners and are used with attribution where applicable. No affiliation, endorsement or transfer of rights is implied.
+
+AROUND THE MAIN is an independent editorial project. Content is provided for informational purposes and does not constitute professional, financial, legal or other advice.
+
+This notice is a transparency measure and is not a substitute for licensing, permission, rights clearance, legal review or compliance with applicable law.
+
+### Current production priorities
+
+Operational stability and timely publication have priority over decorative visual generation.
+
+The system must continue to prioritize:
+
+source collection;
+event clustering;
+verification;
+editorial selection;
+geographic diversity;
+dynamic page planning;
+text-first Full/Mobile presentation;
+Audio generation;
+Telegram delivery;
+quality control.
+
+The production goal remains:
+
+ACCURATE + INTERNATIONAL + FAST + STABLE
+
+Three editions per day.

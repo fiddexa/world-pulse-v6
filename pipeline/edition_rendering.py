@@ -63,6 +63,15 @@ def render_edition(
 
     physical_page_number = 1
 
+    total_full_pages = 0
+    for page in pages:
+        if page.page_number == 1:
+            total_full_pages += 1
+        else:
+            total_full_pages += len(
+                plan_section_pages(page)
+            )
+
     for page in pages:
         if page.page_number == 1:
             output_path = full_root / "page-01.png"
@@ -84,6 +93,10 @@ def render_edition(
                     output_path,
                     page_number=physical_page_number,
                     page_plan=plan,
+                    is_last_page=(
+                        physical_page_number
+                        == total_full_pages
+                    ),
                 )
                 full_files.append(str(output_path))
                 physical_page_number += 1

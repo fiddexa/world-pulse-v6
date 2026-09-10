@@ -194,6 +194,13 @@ def process_articles(articles, *, editorial_time=None):
 
     editorial = decide_events(ranked)
 
+    # AI-generated editorial visuals are the default visual format
+    # for selected stories.
+    #
+    # One event -> one reusable image asset.
+    # Branding is applied programmatically by ai_visuals.py.
+    #
+    # Generation failures do not attach unrelated images.
     content = build_contents(editorial)
 
     publication = build_publications(content)

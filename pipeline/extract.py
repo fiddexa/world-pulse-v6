@@ -200,6 +200,34 @@ EVENT_PATTERNS = {
         "recession",
         "inflation",
         "default",
+        "investment",
+        "investments",
+        "invest",
+        "funding",
+        "financing",
+        "jobs",
+        "employment",
+        "expansion",
+        "acquisition",
+        "project",
+    },
+
+    "technology": {
+        "technology",
+        "technologies",
+        "tech",
+        "space",
+        "artificial",
+        "intelligence",
+        "ai",
+        "cyber",
+        "cyberattack",
+        "cybersecurity",
+        "software",
+        "data",
+        "datacentre",
+        "datacenter",
+        "digital",
     },
 
     "diplomatic": {
@@ -210,6 +238,8 @@ EVENT_PATTERNS = {
         "negotiation",
         "negotiations",
         "diplomatic",
+        "summit",
+        "summits",
     },
 }
 
@@ -221,6 +251,15 @@ LOCATION_ALIASES = {
     "russia": "russia",
     "russian": "russia",
     "sudan": "sudan",
+    "sudanese": "sudan",
+    "mali": "mali",
+    "malian": "mali",
+    "finland": "finland",
+    "finnish": "finland",
+    "europe": "europe",
+    "european": "europe",
+    "hamburg": "hamburg",
+    "germanys": "germany",
     "nepal": "nepal",
     "china": "china",
     "germany": "germany",
@@ -266,7 +305,19 @@ ACTOR_ALIASES = {
     "south korea": "south_korea",
     "germany": "germany",
     "france": "france",
+    "french": "france",
     "poland": "poland",
+    "germany": "germany",
+    "german": "germany",
+    "germanys": "germany",
+    "finland": "finland",
+    "finnish": "finland",
+    "mali": "mali",
+    "google": "google",
+    "alphabet": "google",
+    "us": "united_states",
+    "united states": "united_states",
+    "malian": "mali",
 }
 
 
@@ -305,6 +356,35 @@ OBJECT_GROUPS = {
         "hospitals",
         "clinic",
         "clinics",
+    },
+
+    "technology": {
+        "technology",
+        "tech",
+        "software",
+        "hardware",
+        "data",
+        "digital",
+        "ai",
+        "cyber",
+        "cybersecurity",
+    },
+
+    "information_warfare": {
+        "information",
+        "propaganda",
+        "disinformation",
+        "misinformation",
+        "information",
+        "warfare",
+    },
+
+    "chemical_weapons": {
+        "chemical",
+        "chemicals",
+        "toxic",
+        "poison",
+        "poisoning",
     },
 }
 
@@ -762,6 +842,43 @@ def extract_scale_numbers(text):
             f"{number_text} {scale_word
 }",
             context,
+        )
+
+
+    # ---------------------------------------------------------
+    # ABBREVIATED SCALE FORMS
+    #
+    # 13bn
+    # 5m
+    # 1.2bn
+    # 500k
+    # ---------------------------------------------------------
+
+    short_scale_pattern = re.compile(
+        r"\b(\d+(?:\.\d+)?)\s*"
+        r"(k|m|mn|b|bn|bn|t|tn)\b",
+        re.IGNORECASE,
+    )
+
+    short_scale_map = {
+        "k": 1_000,
+        "m": 1_000_000,
+        "mn": 1_000_000,
+        "b": 1_000_000_000,
+        "bn": 1_000_000_000,
+        "t": 1_000_000_000_000,
+        "tn": 1_000_000_000_000,
+    }
+
+    for match in short_scale_pattern.finditer(text):
+        value = float(match.group(1))
+        unit = match.group(2).lower()
+
+        add_result(
+            value,
+            short_scale_map[unit],
+            f"{match.group(1)}{unit}",
+            "",
         )
 
     # ---------------------------------------------------------

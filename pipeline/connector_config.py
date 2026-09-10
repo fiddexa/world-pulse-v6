@@ -29,7 +29,22 @@ CONNECTOR_REGISTRY = {
 
     "bbc": {
         "type": CONNECTOR_RSS,
-        "enabled": False,
+        "enabled": True,
+    },
+
+    "dw": {
+        "type": CONNECTOR_RSS,
+        "enabled": True,
+    },
+
+    "euronews": {
+        "type": CONNECTOR_RSS,
+        "enabled": True,
+    },
+
+    "africanews": {
+        "type": CONNECTOR_RSS,
+        "enabled": True,
     },
 
     "afp": {

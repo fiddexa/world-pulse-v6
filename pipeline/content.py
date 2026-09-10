@@ -115,26 +115,26 @@ def _section(event):
     """
     Determine the primary editorial section for an event.
 
-    Priority:
-    1. Explicit editorial section, when it matches a supported section.
-    2. Deterministic content-based classification.
-    3. WORLD fallback.
+    Editorial classification is based primarily on the event headline,
+    summary and short article metadata. Full article bodies are not used
+    for section classification because secondary keywords can distort the
+    primary topic.
 
-    A country/location is never used as the section.
+    Countries and locations alone never determine the section.
     """
 
     allowed = {
-        "world": "world",
-        "geopolitics": "geopolitics",
-        "business": "business",
-        "energy": "energy",
-        "technology": "technology",
-        "science_health": "science_health",
-        "climate": "climate",
-        "trade_logistics": "trade_logistics",
-        "society": "society",
-        "culture": "culture",
-        "sports": "sports",
+        "world",
+        "geopolitics",
+        "business",
+        "energy",
+        "technology",
+        "science_health",
+        "climate",
+        "trade_logistics",
+        "society",
+        "culture",
+        "sports",
     }
 
     aliases = {
@@ -167,153 +167,216 @@ def _section(event):
     editorial = event.get("editorial")
 
     if isinstance(editorial, dict):
-        value = _first_nonempty(
-            editorial.get("section")
-        )
+        value = _first_nonempty(editorial.get("section"))
 
         if value:
-            normalized = aliases.get(
-                value.strip().lower()
-            )
+            normalized = aliases.get(value.strip().lower())
 
-            # Trust explicit editorial categories,
-            # but let generic WORLD be classified from content.
-            if normalized in allowed.values() and normalized != "world":
+            if normalized in allowed and normalized != "world":
                 return normalized
 
-    parts = []
+    headline_parts = []
+    context_parts = []
 
-    def add_text(value):
+    def add_headline(value):
         value = _first_nonempty(value)
-
         if value:
-            parts.append(value)
+            headline_parts.append(value)
 
-    add_text(event.get("title"))
-    add_text(event.get("headline"))
-    add_text(event.get("summary"))
-    add_text(event.get("description"))
-    add_text(event.get("why_it_matters"))
+    def add_context(value):
+        value = _first_nonempty(value)
+        if value:
+            context_parts.append(value)
+
+    add_headline(event.get("title"))
+    add_headline(event.get("headline"))
+
+    add_context(event.get("summary"))
+    add_context(event.get("description"))
+    add_context(event.get("why_it_matters"))
 
     for article in _articles(event):
         if not isinstance(article, dict):
             continue
 
-        add_text(article.get("title"))
-        add_text(article.get("headline"))
-        add_text(article.get("summary"))
-        add_text(article.get("description"))
-        add_text(article.get("content"))
+        add_headline(article.get("title"))
+        add_headline(article.get("headline"))
 
-    text = " ".join(parts).lower()
+        add_context(article.get("summary"))
+        add_context(article.get("description"))
 
-    rules = {
-        "climate": (
-            "climate", "climate change", "global warming",
+    headline = " ".join(headline_parts).lower()
+    context = " ".join(context_parts).lower()
+    text = f"{headline} {context}"
+
+    def has_any(value, keywords):
+        return any(keyword in value for keyword in keywords)
+
+    # 1. High-confidence health signals.
+    if has_any(
+        text,
+        (
+            "mpox", "monkeypox", "ebola", "outbreak", "epidemic",
+            "pandemic", "virus", "disease", "vaccine", "vaccination",
+            "hospital", "clinical trial", "medical", "healthcare",
+            "cancer",
+        ),
+    ):
+        return "science_health"
+
+    # 2. High-confidence climate and environmental disasters.
+    if has_any(
+        text,
+        (
+            "climate change", "global warming", "climate",
             "flood", "flooding", "wildfire", "wildfires",
-            "drought", "hurricane", "cyclone", "storm",
-            "earthquake", "tsunami", "volcanic",
-            "extreme weather", "heatwave", "heat wave",
-            "environment", "emissions", "carbon",
+            "drought", "hurricane", "cyclone", "earthquake",
+            "tsunami", "volcanic", "extreme weather",
+            "heatwave", "heat wave", "emissions",
             "greenhouse gas", "deforestation",
         ),
+    ):
+        return "climate"
 
-        "energy": (
-            "oil", "crude", "petroleum", "gas", "natural gas",
-            "lng", "lpg", "opec", "opec+", "refinery",
-            "refinery", "fuel", "diesel", "gasoline",
-            "jet fuel", "electricity", "power grid",
-            "energy", "solar power", "wind power",
-            "nuclear power",
-        ),
-
-        "technology": (
-            "technology", "tech", "artificial intelligence",
-            "ai model", "ai", "software", "semiconductor",
-            "chip", "chips", "computer", "cyber",
-            "cybersecurity", "robot", "robotics",
-            "smartphone", "internet", "data center",
+    # 3. Clear technology stories. "Information war + AI" belongs here.
+    if has_any(
+        text,
+        (
+            "artificial intelligence", "ai model", "generative ai",
+            "openai", "chatgpt", "software", "semiconductor",
+            "chip", "chips", "cyber", "cybersecurity",
+            "cyber attack", "hackers", "hacking", "robotics",
+            "robot", "smartphone", "internet", "data center",
             "space technology",
         ),
+    ):
+        return "technology"
 
-        "sports": (
+    # 4. Clear culture and sports.
+    if has_any(
+        text,
+        (
+            "film", "movie", "cinema", "music", "concert",
+            "museum", "theatre", "theater", "artist", "festival",
+            "book", "literature", "actor", "actress",
+        ),
+    ):
+        return "culture"
+
+    if has_any(
+        text,
+        (
             "football", "soccer", "basketball", "tennis",
             "cricket", "rugby", "baseball", "hockey",
             "olympics", "olympic", "championship",
             "tournament", "league", "athlete", "athletes",
             "match", "world cup", "grand slam",
         ),
+    ):
+        return "sports"
 
-        "culture": (
-            "film", "movie", "cinema", "music", "concert",
-            "museum", "theatre", "theater", "art",
-            "artist", "culture", "cultural", "festival",
-            "book", "literature", "actor", "actress",
+    # 5. Education and civilian incidents are normally Society.
+    # This is checked before the generic military/geopolitical layer.
+    if has_any(
+        text,
+        (
+            "education", "school", "schools", "classroom",
+            "teacher", "teachers", "student", "students",
+            "university", "universities",
+            "train collides", "train collision",
+            "road accident", "car crash", "truck crash",
+            "plane crash", "ship fire", "ferry fire",
+            "fire breaks out", "building fire",
+            "wedding fire", "collision", "accident", "crash",
+            "missing",
         ),
+    ):
+        # Exception: explicit military attacks remain geopolitical.
+        if not has_any(
+            headline,
+            (
+                "airstrike", "missile strike", "missile attack",
+                "drone attack", "drone strike", "bombing",
+                "military strike", "troops attack",
+            ),
+        ):
+            return "society"
 
-        "science_health": (
-            "health", "medical", "medicine", "hospital",
-            "doctor", "disease", "virus", "vaccine",
-            "vaccination", "pandemic", "epidemic",
-            "who ", "unicef", "cancer", "clinical trial",
-            "research", "scientists", "science", "study",
-            "drug", "healthcare",
+    # 6. Energy.
+    if has_any(
+        text,
+        (
+            "lng", "lpg", "crude oil", "oil price", "oil hits",
+            "petroleum", "refinery", "fuel", "diesel",
+            "gasoline", "jet fuel", "opec", "natural gas",
+            "energy prices", "power grid", "electricity",
+            "solar power", "wind power", "nuclear power",
+            "energy",
         ),
+    ):
+        return "energy"
 
-        "trade_logistics": (
-            "trade", "trading", "export", "exports",
-            "import", "imports", "tariff", "tariffs",
-            "customs", "shipping", "shipment",
-            "logistics", "port", "ports", "cargo",
-            "freight", "supply chain", "supply chains",
-            "trade agreement", "trade deal",
+    # 7. Trade/logistics.
+    if has_any(
+        text,
+        (
+            "imports", "import", "exports", "export",
+            "tariff", "tariffs", "customs", "shipping",
+            "shipment", "logistics", "cargo", "freight",
+            "supply chain", "trade agreement", "trade deal",
+            "trade restrictions", "ban imports",
         ),
+    ):
+        return "trade_logistics"
 
-        "business": (
-            "business", "company", "companies", "corporate",
+    # 8. Business/economics.
+    if has_any(
+        text,
+        (
+            "budget deficit", "investment", "invests",
+            "investors", "company", "companies", "corporate",
             "corporation", "market", "markets", "stock",
-            "stocks", "shares", "investor", "investors",
-            "investment", "bank", "banking", "finance",
-            "financial", "economy", "economic", "gdp",
-            "inflation", "interest rate", "earnings",
-            "profit", "merger", "acquisition",
+            "stocks", "shares", "finance", "financial",
+            "economy", "economic", "gdp", "inflation",
+            "interest rate", "earnings", "profit",
+            "merger", "acquisition", "funding",
         ),
+    ):
+        return "business"
 
-        "society": (
-            "election", "elections", "government", "protest",
-            "protests", "demonstration", "demonstrations",
-            "society", "social", "population", "migration",
-            "migrant", "refugee", "refugees", "education",
-            "school", "schools", "crime", "police",
-            "workers", "labor", "labour",
-        ),
-
-        "geopolitics": (
-            "war", "conflict", "military", "army",
-            "troops", "missile", "missiles", "nato",
-            "sanctions", "diplomatic", "diplomacy",
+    # 9. Geopolitics: strong political / diplomatic / military signals.
+    # Country names alone are deliberately NOT included.
+    if has_any(
+        text,
+        (
+            "war", "conflict", "military", "army", "troops",
+            "missile", "missiles", "airstrike", "drone attack",
+            "drone strike", "drone war", "bombing",
+            "weapons depot", "weapons", "ceasefire",
+            "peace talks", "peace negotiations",
+            "de-escalation", "diplomatic", "diplomacy",
+            "sanctions", "foreign policy",
             "president", "prime minister", "foreign minister",
-            "summit", "peace talks", "ceasefire",
-            "iran", "israel", "ukraine", "russia",
-            "china", "united states", "north korea",
+            "lawmakers", "parliament", "election", "elections",
+            "midterm", "midterms", "government",
+            "summit", "arms deal", "military hardware",
+            "chemical weapons", "intelligence warned",
         ),
-    }
+    ):
+        return "geopolitics"
 
-    scores = {
-        section: sum(
-            1 for keyword in keywords
-            if keyword in text
-        )
-        for section, keywords in rules.items()
-    }
-
-    best_section = max(
-        scores,
-        key=scores.get,
-    )
-
-    if scores[best_section] > 0:
-        return best_section
+    # 10. General society fallback.
+    if has_any(
+        text,
+        (
+            "society", "social", "population", "migration",
+            "migrant", "refugee", "protest", "protests",
+            "demonstration", "demonstrations",
+            "crime", "police", "workers", "labor", "labour",
+            "humanitarian",
+        ),
+    ):
+        return "society"
 
     return "world"
 
