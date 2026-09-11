@@ -158,69 +158,82 @@ def build_edition_pages(
     edition: dict[str, Any],
 ) -> list[EditionPage]:
     """
-    Build physical newspaper pages for one edition.
+    Build physical newspaper pages from the single ordered Edition stream.
 
-    PAGE 01 is the front page.
-
-    Remaining stories are packed into dense physical pages instead
-    of creating one sparse page per category.
-
-    Rules:
-    - no empty pages;
-    - no duplicate front-page events;
-    - preserve editorial order;
-    - preserve category information;
-    - small category groups may share a page stream;
-    - physical pagination is decided by the renderer from measured content;
-    - page title reflects categories actually present.
+    Page 01 and all later pages use the same editorial sequence.
+    The renderer decides the visual geometry; this layer decides only
+    which stories belong to which physical page stream.
     """
 
     if not isinstance(edition, dict):
-        raise ValueError("edition must be a dictionary")
+        raise ValueError(
+            "edition must be a dictionary"
+        )
 
     pages: list[EditionPage] = []
+
+    # ================================================================
+    # ONE ORDERED EDITORIAL STREAM
+    # ================================================================
+
+    ordered = [
+        event
+        for event in (
+            edition.get("ordered")
+            or []
+        )
+        if isinstance(event, dict)
+    ]
+
+    # Backward-compatible fallback for older Edition Models.
+    if not ordered:
+        fallback = []
+
+        top_story = edition.get(
+            "top_story"
+        )
+
+        if isinstance(top_story, dict):
+            fallback.append(
+                top_story
+            )
+
+        for key in (
+            "main_stories",
+            "briefs",
+        ):
+            values = edition.get(
+                key
+            )
+
+            if isinstance(values, list):
+                fallback.extend(
+                    event
+                    for event in values
+                    if isinstance(
+                        event,
+                        dict,
+                    )
+                )
+
+        ordered = fallback
 
     # ================================================================
     # PAGE 01
     # ================================================================
 
-    front_events: list[dict[str, Any]] = []
-
-    top_story = edition.get("top_story")
-
-    if isinstance(top_story, dict):
-        front_events.append(top_story)
-
-    for key in ("main_stories", "briefs"):
-        values = edition.get(key, [])
-
-        if not isinstance(values, list):
-            continue
-
-        for event in values:
-            if isinstance(event, dict):
-                front_events.append(event)
-
-    unique_front = []
-    seen = set()
-
-    for event in front_events:
-        marker = id(event)
-
-        if marker in seen:
-            continue
-
-        seen.add(marker)
-        unique_front.append(event)
-
-    front_events = unique_front
+    front_events = ordered[:5]
 
     pages.append(
         EditionPage(
             page_number=1,
             page_type=PAGE_FRONT,
-            title=_page_title(PAGE_FRONT),
-            events=front_events,
+            title=_page_title(
+                PAGE_FRONT
+            ),
+            events=list(
+                front_events
+            ),
         )
     )
 
@@ -228,37 +241,13 @@ def build_edition_pages(
     # REMAINING EVENTS
     # ================================================================
 
-    remaining: list[dict[str, Any]] = []
-
-    front_ids = {
-        id(event)
-        for event in front_events
-    }
-
-    for key in (
-        "additional_events",
-        "remaining_events",
-        "overflow_events",
-    ):
-        values = edition.get(key, [])
-
-        if not isinstance(values, list):
-            continue
-
-        for event in values:
-            if not isinstance(event, dict):
-                continue
-
-            if id(event) in front_ids:
-                continue
-
-            remaining.append(event)
+    remaining = ordered[5:]
 
     if not remaining:
         return pages
 
     # ================================================================
-    # GROUP INTO CATEGORY STREAMS
+    # GROUP REMAINING STORIES INTO CATEGORY STREAMS
     # ================================================================
 
     category_order = [
@@ -271,23 +260,39 @@ def build_edition_pages(
         PAGE_SPORTS,
     ]
 
-    groups: dict[str, list[dict[str, Any]]] = {}
+    groups: dict[
+        str,
+        list[dict[str, Any]],
+    ] = {}
 
     for event in remaining:
-        category = _event_category(event)
-        page_type = _category_page_type(category)
+
+        category = _event_category(
+            event
+        )
+
+        page_type = _category_page_type(
+            category
+        )
 
         if page_type is None:
             page_type = PAGE_WORLD
 
-        groups.setdefault(page_type, []).append(event)
+        groups.setdefault(
+            page_type,
+            [],
+        ).append(event)
 
     # ================================================================
-    # DENSE PAGE PACKING
+    # DENSE PAGE STREAM
     # ================================================================
 
     page_number = 2
-    current_events: list[dict[str, Any]] = []
+
+    current_events: list[
+        dict[str, Any]
+    ] = []
+
     current_types: list[str] = []
 
     def flush_page():
@@ -302,16 +307,17 @@ def build_edition_pages(
 
         for item in current_types:
             if item not in unique_types:
-                unique_types.append(item)
+                unique_types.append(
+                    item
+                )
 
         if len(unique_types) == 1:
             page_type = unique_types[0]
-            title = _page_title(page_type)
+            title = _page_title(
+                page_type
+            )
         else:
             page_type = "MIXED"
-            # Physical pages can carry several editorial streams.  Their
-            # individual categories remain visible on every story card, so a
-            # long slash-separated heading only adds visual noise.
             title = "GLOBAL NEWS"
 
         pages.append(
@@ -319,7 +325,9 @@ def build_edition_pages(
                 page_number=page_number,
                 page_type=page_type,
                 title=title,
-                events=list(current_events),
+                events=list(
+                    current_events
+                ),
             )
         )
 
@@ -327,12 +335,28 @@ def build_edition_pages(
         current_events = []
         current_types = []
 
-    for page_type in category_order:
-        events = groups.get(page_type, [])
+    # Preserve ordered sequence.
+    for event in remaining:
 
-        for event in events:
-            current_events.append(event)
-            current_types.append(page_type)
+        page_type = _category_page_type(
+            _event_category(event)
+        )
+
+        if page_type is None:
+            page_type = PAGE_WORLD
+
+        current_events.append(
+            event
+        )
+
+        current_types.append(
+            page_type
+        )
+
+        # Keep the physical stream dense.
+        # The renderer's page planner performs the actual geometry.
+        if len(current_events) >= 7:
+            flush_page()
 
     flush_page()
 

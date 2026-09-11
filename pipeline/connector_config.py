@@ -42,14 +42,24 @@ CONNECTOR_REGISTRY = {
         "enabled": True,
     },
 
-    "africanews": {
+    "afp": {
+        "type": CONNECTOR_LICENSED,
+        "enabled": False,
+    },
+
+    "uk_gov": {
         "type": CONNECTOR_RSS,
         "enabled": True,
     },
 
-    "afp": {
-        "type": CONNECTOR_LICENSED,
-        "enabled": False,
+    "canada_news": {
+        "type": CONNECTOR_RSS,
+        "enabled": True,
+    },
+
+    "european_commission": {
+        "type": CONNECTOR_RSS,
+        "enabled": True,
     },
 
     "un": {

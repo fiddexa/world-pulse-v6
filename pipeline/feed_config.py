@@ -70,11 +70,45 @@ FEED_REGISTRY = {
         },
     ],
 
-    "africanews": [
+
+    "uk_gov": [
         {
-            "url": "https://www.africanews.com/feed/",
-            "source": "Africanews",
-            "name": "Africanews",
+            "url": "https://www.gov.uk/search/news-and-communications.atom",
+            "source": "uk_gov",
+            "name": "GOV.UK News and Communications",
+            "type": "rss",
+            "requires_auth": False,
+            "category": "world",
+        },
+    ],
+
+    "canada_news": [
+        {
+            "url": (
+                "https://api.io.canada.ca/io-server/gc/news/en/v2"
+                "?atomtitle=National+News"
+                "&format=atom"
+                "&orderBy=desc"
+                "&pick=100"
+                "&publishedDate%3E=2021-10-25"
+                "&sort=publishedDate"
+            ),
+            "source": "canada_news",
+            "name": "Canada National News",
+            "type": "rss",
+            "requires_auth": False,
+            "category": "world",
+        },
+    ],
+
+    "european_commission": [
+        {
+            "url": (
+                "https://ec.europa.eu/commission/presscorner/api/rss"
+                "?language=en"
+            ),
+            "source": "european_commission",
+            "name": "European Commission Press Corner",
             "type": "rss",
             "requires_auth": False,
             "category": "world",
