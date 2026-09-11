@@ -7,7 +7,7 @@ AROUND THE MAIN is an automated international news publication system. It transf
 
 **AROUND THE MAIN is not a headline-copying aggregator.** Sources provide reporting, facts, data and context; the final product is independently selected, verified, structured and written.
 
-> **Current specification: `AROUND_THE_MAIN_TZ_v1.3.md`**
+> **Current specification: `AROUND_THE_MAIN_TZ_v1.4.md`**
 
 ---
 
@@ -96,6 +96,24 @@ The Edition Model contains, at minimum:
 ```
 
 ---
+
+### Release-to-release information window
+
+Mobile and Audio news selection is based on the information flow between scheduled releases.
+
+Canonical daily release slots:
+- 07:00
+- 13:00
+- 20:00
+
+Release windows:
+- 07:00 release: 20:00 previous day → 07:00
+- 13:00 release: 07:00 → 13:00
+- 20:00 release: 13:00 → 20:00
+
+The primary editorial objective is to publish all new and materially relevant information that became available after the previous release. The number of stories is adaptive and is not constrained by a fixed target, minimum, or maximum.
+
+Recent information receives additional freshness priority, while older but materially important developments remain eligible.
 
 ## 4. Editorial Snapshot
 
@@ -192,6 +210,14 @@ The system must never create weak, repetitive or low-value stories simply to rea
 Page count is dynamic and follows actual editorial volume.
 
 ---
+
+### Adaptive release volume
+
+There is no fixed Mobile/Audio story target.
+
+A release may contain 5, 10, 25, 40 or another number of stories depending on the amount of new qualifying information available since the previous release.
+
+The system must not add lower-quality items solely to reach a numeric target and must not suppress qualifying important events solely because a numeric target has been reached.
 
 ## 7. Source Network
 
@@ -496,6 +522,16 @@ It must not become a blanket ban on later editorial reconsideration.
 
 ---
 
+### Release continuity
+
+Event Memory is used to distinguish previously used events from new information.
+
+An event already used in an earlier edition must not be republished unchanged.
+
+A materially changed development may be selected as new information when its event identity/fingerprint is different.
+
+Event Memory records only events actually present in the ordered edition output for release history purposes.
+
 ## 20. Archive / Reproducibility
 
 Each edition should be reproducible. Persist, where available:
@@ -650,9 +686,18 @@ The repository must not claim global coverage until the source registry actually
 
 ---
 
+### Release-to-release collection
+
+The current Mobile + Audio information model is release-driven:
+
+previous completed release → current release
+
+The system prioritizes all new and materially relevant events in that window, with freshness and editorial importance controlling order. Story count is adaptive and has no fixed target.
+
+
 ## 27. Canonical Files
 
-- `AROUND_THE_MAIN_TZ_v1.3.md` — current controlling technical specification;
+- `AROUND_THE_MAIN_TZ_v1.4.md` — current controlling technical specification;
 - `AROUND_THE_MAIN_TZ_v1.2.txt` — previous working specification retained for history;
 - `README.md` — project overview and operational rules.
 
@@ -786,3 +831,29 @@ The production goal remains:
 ACCURATE + INTERNATIONAL + FAST + STABLE
 
 Three editions per day.
+
+## RELEASE-TO-RELEASE NEWS COLLECTION RULE
+
+The canonical Mobile + Audio collection model is release-to-release.
+
+Scheduled releases:
+- 07:00
+- 13:00
+- 20:00
+
+Primary information windows:
+- 20:00 previous day → 07:00
+- 07:00 → 13:00
+- 13:00 → 20:00
+
+Editorial rule:
+1. Prioritize new information after the previous release.
+2. Include materially new developments of ongoing stories.
+3. Use editorial importance and freshness to rank qualifying items.
+4. Use geographic and thematic diversity as a soft preference only.
+5. Do not impose a fixed story count.
+6. Do not add weak material merely to fill a target.
+7. Do not suppress important new material merely because a target has been reached.
+8. Use Event Memory to prevent unchanged repetition across releases.
+9. Mobile and Audio must consume the same selected event set.
+10. Full Edition remains outside the current Mobile + Audio implementation scope.

@@ -597,124 +597,137 @@ def _event_category(event: dict) -> str:
 def _card_height(
     event: dict,
     *,
-    compact: bool = False,
+    compact: bool = True,
 ) -> int:
-    """Calculate a content-driven mobile news-card height."""
+    """
+    Calculate the exact height of a text-only mobile story card.
+
+    Mobile production is currently text-first:
+    no story photographs are rendered.
+
+    The same geometry is used during pagination and final drawing,
+    so a card can never overflow into the next UI block.
+    """
 
     if not isinstance(event, dict):
-        return 165 if compact else 285
+        return 190
 
     probe = Image.new(
         "RGB",
         (WIDTH, MOBILE_PAGE_HEIGHT),
         NEWSPAPER,
     )
+
     probe_draw = ImageDraw.Draw(probe)
 
-    card_inner_width = WIDTH - MARGIN * 2 - 32
-    has_image = _has_real_image(event)
+    title_font = _font(20, bold=True)
+    summary_font = _font(13)
+    source_font = _font(11)
 
-    if compact:
-        image_width = 245
-        image_gap = 18
-        title_font = _font(20, bold=True)
-        summary_font = _font(14)
-        title_max_lines = 3
-        summary_max_lines = 3
-        title_spacing = 4
-        summary_spacing = 5
-        min_height = 165
-        max_height = 265
-    else:
-        image_width = 285
-        image_gap = 18
-        title_font = _font(30, bold=True)
-        summary_font = _font(18)
-        title_max_lines = 5
-        summary_max_lines = 5
-        title_spacing = 5
-        summary_spacing = 6
-        min_height = 285
-        max_height = 390
+    title_max_lines = 2
+    summary_max_lines = 3
 
-    text_width = (
-        card_inner_width - image_width - image_gap
-        if has_image
-        else card_inner_width
+    card_inner_width = (
+        WIDTH
+        - MARGIN * 2
+        - 32
     )
-
-    title = _title(event)
-    summary = _summary(event)
 
     title_lines = _wrap(
         probe_draw,
-        title,
+        _title(event),
         title_font,
-        text_width,
+        card_inner_width,
     )[:title_max_lines]
-
-    summary_lines = (
-        _wrap(
-            probe_draw,
-            summary,
-            summary_font,
-            text_width,
-        )[:summary_max_lines]
-        if summary
-        else []
-    )
 
     title_line_height = (
         title_font.getbbox("Ag")[3]
         - title_font.getbbox("Ag")[1]
-        + title_spacing
+        + 4
     )
+
+    summary = _summary(event)
+
+    summary_lines = []
+
+    if summary:
+        summary_lines = _wrap(
+            probe_draw,
+            summary,
+            summary_font,
+            card_inner_width,
+        )[:summary_max_lines]
 
     summary_line_height = (
         summary_font.getbbox("Ag")[3]
         - summary_font.getbbox("Ag")[1]
-        + summary_spacing
+        + 4
     )
 
-    height = 35 + 18
+    sources = _sources(event)
 
-    height += len(title_lines) * title_line_height
+    source_lines = []
 
-    if summary_lines:
-        height += 7
-        height += len(summary_lines) * summary_line_height
-
-    if has_image:
-        summary_count = len(summary_lines)
-
-        if compact:
-            image_height = (
-                105 if summary_count <= 1
-                else 125 if summary_count == 2
-                else 145
-            )
-        else:
-            image_height = (
-                145 if summary_count <= 1
-                else 175 if summary_count == 2
-                else 205
-            )
-
-        height = max(
-            height,
-            35 + image_height + 18,
+    if sources:
+        source_text = "  •  ".join(
+            sources[:3]
         )
 
-    if _sources(event):
-        # SOURCE is bottom-anchored during rendering, so its complete
-        # vertical footprint must be part of the final card height.
-        source_reserve = 58
-        height += source_reserve
+        source_lines = _wrap(
+            probe_draw,
+            source_text,
+            source_font,
+            max(
+                1,
+                card_inner_width - 55,
+            ),
+        )[:2]
 
-    return max(
-        min_height,
-        min(max_height, height),
+    source_line_height = (
+        source_font.getbbox("Ag")[3]
+        - source_font.getbbox("Ag")[1]
+        + 2
     )
+
+    # Header band.
+    height = 35 + 15
+
+    # Headline.
+    if title_lines:
+        height += (
+            len(title_lines)
+            * title_line_height
+        )
+        height += 7
+
+    # Summary.
+    if summary_lines:
+        height += (
+            len(summary_lines)
+            * summary_line_height
+        )
+        height += 7
+
+    # Source.
+    if source_lines:
+        height += max(
+            18,
+            len(source_lines)
+            * source_line_height,
+        )
+
+    # Bottom padding.
+    height += 14
+
+    # Keep every card readable and predictable.
+    return max(
+        175,
+        min(
+            300,
+            height,
+        ),
+    )
+
 
 def render_mobile_edition(
     edition: dict,
@@ -778,26 +791,36 @@ def render_mobile_edition(
 
     # A page with no stories is still a valid mobile edition.
     #
-    # Unified adaptive pagination:
-    # - the same packing logic is used on PAGE 01 and later pages;
-    # - a story uses its actual content-driven height;
-    # - there is no artificial "maximum two stories" rule;
-    # - the first story remains the lead presentation, but pagination
-    #   is still governed by available vertical space.
+    # Pagination is determined by measured card height.
+    # There is NO fixed story count per page.
+    #
+    # Rules:
+    # - stories are never split;
+    # - PAGE 01 has its larger branded header and footer;
+    # - PAGE 02+ uses the compact header/footer;
+    # - a story moves to the next page when the complete card
+    #   no longer fits in the remaining vertical space.
 
     pages: list[list[dict]] = []
 
     current_page: list[dict] = []
     current_height = 0
+    page_index = 0
 
-    for event_index, event in enumerate(events):
-        # Story 01 remains the lead story.
-        # All following stories use the compact card treatment.
-        compact = event_index > 0
+    for event in events:
+
+        # All mobile cards use the same compact visual language.
+        compact = True
 
         event_height = _card_height(
             event,
             compact=compact,
+        )
+
+        available = (
+            available_first
+            if page_index == 0
+            else available_other
         )
 
         required_height = event_height
@@ -805,24 +828,19 @@ def render_mobile_edition(
         if current_page:
             required_height += CARD_GAP
 
-        available_height = (
-            available_first
-            if not pages
-            else available_other
-        )
-
-        # If the story does not fit, close the current page
-        # and start a new one.
+        # If the complete card does not fit, start a new page.
         if (
             current_page
-            and current_height + required_height > available_height
+            and current_height + required_height > available
         ):
             pages.append(current_page)
 
             current_page = []
             current_height = 0
+            page_index += 1
+
+            available = available_other
             required_height = event_height
-            available_height = available_other
 
         current_page.append(event)
         current_height += required_height
@@ -1178,6 +1196,42 @@ def render_mobile_edition(
                 footer,
             )
 
+            # =========================================================
+            # READY QR CODE OVERLAY
+            # =========================================================
+
+            qr_path = Path("assets/qr_code.png")
+
+            if page_number == 1 and qr_path.exists():
+                try:
+                    with Image.open(qr_path) as source:
+                        qr = ImageOps.contain(
+                            source.convert("RGBA"),
+                            (118, 118),   # размер QR — меняйте здесь
+                            method=Image.Resampling.LANCZOS,
+                        )
+
+                    # -------------------------------------------------
+                    # POSITION — меняйте X / Y здесь
+                    # -------------------------------------------------
+
+                    qr_x = 777
+                    qr_y = 1058
+
+                    canvas.paste(
+                        qr,
+                        (
+                            qr_x,
+                            qr_y,
+                        ),
+                        qr,
+                    )
+
+                except Exception as exc:
+                    print(
+                        f"[WARN] QR overlay failed: {exc}"
+                    )
+
             return footer_top            
 
         except Exception as exc:
@@ -1378,7 +1432,8 @@ def render_mobile_edition(
                 for previous_page in pages[: page_number - 1]
             ) + index + 1
 
-            compact = story_number > 1
+            # One consistent mobile card layout on every page.
+            compact = True
 
             # Use the content-driven height directly.
             # Do not stretch short stories to fill the page.

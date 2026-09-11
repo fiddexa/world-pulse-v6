@@ -9,9 +9,15 @@ organized into an edition.
 """
 import re
 
+from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
-from pipeline.edition_id import build_edition_id
+from pipeline.edition_id import (
+    DEFAULT_TIMEZONE,
+    build_edition_id,
+)
+from pipeline.edition_slots import EDITION_SLOTS
 
 
 SECTION_ORDER = (
@@ -36,6 +42,47 @@ ROLE_ORDER = (
     "MAIN_STORY",
     "BRIEF",
 )
+
+
+def _previous_release_datetime(
+    publication_date,
+    edition_time,
+):
+    """
+    Return the canonical previous scheduled release time.
+
+    Release windows are:
+        07:00 <- 20:00 previous day
+        13:00 <- 07:00 same day
+        20:00 <- 13:00 same day
+    """
+
+    if not publication_date or not edition_time:
+        return None
+
+    try:
+        current_date = datetime.fromisoformat(
+            str(publication_date)
+        ).date()
+
+        current_index = EDITION_SLOTS.index(
+            str(edition_time)
+        )
+    except (ValueError, TypeError):
+        return None
+
+    if current_index == 0:
+        previous_date = current_date - timedelta(days=1)
+        previous_time = EDITION_SLOTS[-1]
+    else:
+        previous_date = current_date
+        previous_time = EDITION_SLOTS[current_index - 1]
+
+    return datetime.fromisoformat(
+        f"{previous_date.isoformat()}T{previous_time}"
+    ).replace(
+        tzinfo=ZoneInfo(DEFAULT_TIMEZONE)
+    )
 
 
 def _safe_number(value: Any) -> float:
@@ -199,28 +246,118 @@ def _sort_key(event: dict) -> tuple:
     )
 
 
-MOBILE_AUDIO_TOTAL = 30
-MOBILE_AUDIO_MIN_FILL = 25
 MOBILE_AUDIO_TOP = 1
-MOBILE_AUDIO_SECTION = 23
-MOBILE_AUDIO_BRIEFS = 6
+MOBILE_AUDIO_SECTION_LIMIT = 23
 MOBILE_AUDIO_MIN_SCORE = 32.0
 MOBILE_AUDIO_MAX_PER_SECTION = 5
 MOBILE_AUDIO_MAX_PER_COUNTRY = 3
 
 
-def _build_mobile_audio_selection(events: list[dict]) -> dict:
+
+def _mobile_audio_official_source_is_international(event):
+    """
+    Mobile/Audio-only relevance gate for official national-government
+    sources.
+
+    This deliberately uses the event headline plus direct summary
+    language rather than aggregated actors/affected_areas, because
+    clustered Event Model metadata may contain secondary/background
+    references that are not the subject of the actual story.
+    """
+    content = event.get("content") or {}
+    sources = {
+        str(source).strip().lower()
+        for source in (content.get("sources") or [])
+    }
+
+    official_sources = {"uk_gov", "canada_news"}
+
+    if not (sources & official_sources):
+        return True
+
+    headline = str(content.get("headline") or "").strip().lower()
+    summary = str(content.get("summary") or "").strip().lower()
+
+    if not headline:
+        return False
+
+    # Explicit foreign countries / territories / international actors.
+    external_entities = (
+        "united states", "u.s.", "us-", "uk-u.s", "uk us",
+        "scotland-massachusetts", "massachusetts",
+        "ukraine", "poland", "nepal", "china", "bangladesh",
+        "russia", "india", "france", "germany", "japan",
+        "israel", "palestine", "gaza", "iran", "australia",
+        "saudi arabia", "nato", "aukus", "iaea",
+        "european union", "e.u.", "brics", "g7", "g20",
+        "united nations",
+    )
+
+    if any(token in headline for token in external_entities):
+        return True
+
+    # Direct cross-border relationships/actions. These are intentionally
+    # restricted to concrete international cooperation rather than
+    # generic mentions of another country in background context.
+    direct_patterns = (
+        r"\bpartnership with\b",
+        r"\bagreement with\b",
+        r"\bcooperation with\b",
+        r"\bcooperation between\b",
+        r"\bdialogue\b.*\b(?:u\.s\.|us|united states|ukraine|china|poland|india)\b",
+        r"\bwith (?:the )?(?:u\.s\.|us|united states|ukraine|china|poland|india|bangladesh|nepal)\b",
+        r"\bto (?:the )?(?:u\.s\.|us|united states|ukraine|china|poland|india|bangladesh|nepal)\b",
+        r"\bin (?:ukraine|poland|nepal|china|bangladesh|india)\b",
+        r"\bon (?:the )?(?:canada-|uk-)?(?:u\.s\.|us)\b",
+    )
+
+    for pattern in direct_patterns:
+        if re.search(pattern, headline):
+            return True
+
+    # A narrow summary fallback for explicit cross-border actions.
+    # This is deliberately conservative so a background sentence such as
+    # "the U.S. is imposing tariffs on Canada" does not make a domestic
+    # Canadian tax announcement international.
+    direct_summary_patterns = (
+        r"\bgovernment-to-government agreement\b",
+        r"\bpartnership with (?:the )?(?:u\.s\.|us|united states|ukraine|poland|china|bangladesh|nepal)\b",
+        r"\bdefence partnerships in poland\b",
+        r"\bdeploy(?:s|ed)? .* to kathmandu\b",
+        r"\bcanada-ukraine\b",
+        r"\bcanada-poland\b",
+        r"\bcanada-bangladesh\b",
+        r"\buk-u\.s\.\b",
+        r"\buk-us\b",
+        r"\baukus\b.*\biaea\b",
+    )
+
+    for pattern in direct_summary_patterns:
+        if re.search(pattern, summary):
+            return True
+
+    return False
+
+
+def _build_mobile_audio_selection(
+    events: list[dict],
+    event_memory=None,
+    publication_date=None,
+    edition_time=None,
+) -> dict:
     """
     Build the broad Mobile/Audio feed from the common Edition Model.
 
     Rules:
-    - target up to 30 stories
-    - keep at least 25 when the candidate pool allows it
+    - adaptive number of stories based on the actual news flow
     - score threshold >= 32
     - exclude explicitly unconfirmed events
     - exclude obvious bulletin/roundup/meta headlines
-    - diversify sections and countries
-    - never select two stories from the same country on the same broad topic
+    - prioritize new events and developments
+    - prioritize events published since the previous scheduled release
+      while allowing materially important older developments to remain eligible
+    - use section/country diversity as a soft preference
+    - never force the edition to a fixed story count
     """
 
     generic_regions = {
@@ -493,10 +630,90 @@ def _build_mobile_audio_selection(events: list[dict]) -> dict:
 
         return re.sub(r"\s+", " ", text_of(event)).lower()[:240]
 
+    current_release = None
+    previous_release = None
+
+    if publication_date and edition_time:
+        try:
+            current_release = datetime.fromisoformat(
+                f"{publication_date}T{edition_time}"
+            ).replace(
+                tzinfo=ZoneInfo(DEFAULT_TIMEZONE)
+            )
+            previous_release = _previous_release_datetime(
+                publication_date,
+                edition_time,
+            )
+        except (TypeError, ValueError):
+            current_release = None
+            previous_release = None
+
+    def latest_published_datetime(event):
+        dates = []
+
+        for article in event.get("articles") or []:
+            value = article.get("published_at")
+
+            if not value:
+                continue
+
+            if isinstance(value, datetime):
+                dt = value
+            else:
+                text = str(value).strip()
+
+                if text.endswith("Z"):
+                    text = text[:-1] + "+00:00"
+
+                try:
+                    dt = datetime.fromisoformat(text)
+                except ValueError:
+                    continue
+
+            if dt.tzinfo is None:
+                dt = dt.replace(
+                    tzinfo=ZoneInfo(DEFAULT_TIMEZONE)
+                )
+
+            else:
+                dt = dt.astimezone(
+                    ZoneInfo(DEFAULT_TIMEZONE)
+                )
+
+            dates.append(dt)
+
+        if not dates:
+            return None
+
+        return max(dates)
+
+    def event_is_in_release_window(event):
+        if current_release is None or previous_release is None:
+            return False
+
+        latest = latest_published_datetime(event)
+
+        if latest is None:
+            return False
+
+        return (
+            previous_release
+            <= latest
+            <= current_release
+        )
+
     candidates = []
 
     for event in events:
         if not isinstance(event, dict):
+            continue
+
+        # Official national-government feeds require a genuine
+        # international/trans-border signal for Mobile/Audio.
+        #
+        # This gate is intentionally local to Mobile/Audio. The common
+        # editorial/ranking model and Full Edition remain unchanged.
+        if not _mobile_audio_official_source_is_international(event):
             continue
 
         if _score(event) < MOBILE_AUDIO_MIN_SCORE:
@@ -516,6 +733,16 @@ def _build_mobile_audio_selection(events: list[dict]) -> dict:
 
         if roundup_re.search(title):
             continue
+
+        # Do not republish the exact same event fingerprint once it
+        # has already appeared in an earlier edition. A materially
+        # changed event normally receives a new fingerprint.
+        if event_memory is not None:
+            try:
+                if event_memory.edition_history(event):
+                    continue
+            except Exception:
+                pass
 
         candidates.append(event)
 
@@ -539,39 +766,48 @@ def _build_mobile_audio_selection(events: list[dict]) -> dict:
 
         value = _score(event)
 
-        if section not in section_counts:
+        # Release-window priority:
+        # new information since the previous scheduled release
+        # is preferred, but older high-value events remain eligible.
+        if event_is_in_release_window(event):
             value += 10.0
+
+        # Freshness is already represented by the Edition Model
+        # ranking. Release-window priority above is the additional
+        # signal used by Mobile + Audio selection.
+
+        # Diversity remains a preference, not a hard filter.
+        if section not in section_counts:
+            value += 7.0
         elif section_counts[section] < MOBILE_AUDIO_MAX_PER_SECTION:
             value += 1.5
         else:
-            value -= 12.0
+            value -= 3.0
 
-        # Avoid allowing geopolitics to dominate the feed when
-        # several other editorial sections still have candidates.
         if section == "geopolitics":
             geo_count = section_counts.get("geopolitics", 0)
 
-            if geo_count >= 6:
-                value -= 7.0
-
             if geo_count >= 8:
-                value -= 12.0
+                value -= 4.0
 
         if countries:
-            if any(country not in country_counts for country in countries):
-                value += 6.0
+            if any(
+                country not in country_counts
+                for country in countries
+            ):
+                value += 4.0
             else:
-                value -= 3.0
+                value -= 1.0
 
             if any(
                 country_counts.get(country, 0) >= MOBILE_AUDIO_MAX_PER_COUNTRY
                 for country in countries
             ):
-                value -= 5.0
+                value -= 1.5
 
         return value
 
-    while len(selected) < MOBILE_AUDIO_TOTAL:
+    while True:
         available = []
 
         for event in candidates:
@@ -583,12 +819,8 @@ def _build_mobile_audio_selection(events: list[dict]) -> dict:
             countries = countries_of(event)
             topic = topic_of(event)
 
-            if countries and any(
-                (country, topic) in country_topic_seen
-                for country in countries
-            ):
-                continue
-
+            # Country/topic diversity is intentionally soft. Do not
+            # suppress an otherwise qualifying important event.
             available.append(event)
 
         if not available:
@@ -610,15 +842,16 @@ def _build_mobile_audio_selection(events: list[dict]) -> dict:
             country_topic_seen.add((country, topic))
 
     top_story = selected[0] if selected else None
+
     main_end = min(
         len(selected),
-        MOBILE_AUDIO_TOP + MOBILE_AUDIO_SECTION,
+        MOBILE_AUDIO_TOP + MOBILE_AUDIO_SECTION_LIMIT,
     )
 
     return {
         "top_story": top_story,
         "main_stories": selected[MOBILE_AUDIO_TOP:main_end],
-        "briefs": selected[main_end:MOBILE_AUDIO_TOTAL],
+        "briefs": selected[main_end:],
         "events": selected,
         "event_count": len(selected),
         "candidate_count": len(candidates),
@@ -630,6 +863,7 @@ def build_edition(
     publication_date=None,
     edition_time=None,
     *,
+    event_memory=None,
     exclude_ignored: bool = False,
 ) -> dict:
     """
@@ -696,6 +930,9 @@ def build_edition(
 
     mobile_audio = _build_mobile_audio_selection(
         ordered,
+        event_memory=event_memory,
+        publication_date=publication_date,
+        edition_time=edition_time,
     )
 
     result = {

@@ -241,13 +241,16 @@ def build_edition_from_articles(
         editorial,
         publication_date=publication_date,
         edition_time=edition_time,
+        event_memory=event_memory,
         exclude_ignored=exclude_ignored,
     )
 
     edition_id = edition.get("edition_id")
 
     if event_memory is not None and edition_id:
-        for event in editorial:
+        used_events = edition.get("ordered") or []
+
+        for event in used_events:
             event_memory.remember(
                 event,
                 edition_id=edition_id,

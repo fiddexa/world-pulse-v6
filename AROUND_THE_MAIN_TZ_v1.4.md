@@ -1,11 +1,11 @@
-# AROUND THE MAIN — TECHNICAL SPECIFICATION v1.3
+# AROUND THE MAIN — TECHNICAL SPECIFICATION v1.4
 
 **Project:** WORLD PULSE v6  
 **Public brand:** AROUND THE MAIN  
 **Primary Telegram:** `@aroundthemain`  
 **Status:** Current working production specification
 
-> v1.3 preserves the core architecture of v1.2 and adds the agreed production standards for global source coverage, edition volume, geographic diversity, source attribution, rights awareness, dynamic page density and publication safety.
+> v1.4 is the current production specification and defines the release-to-release Mobile + Audio collection model, adaptive release volume, global source coverage, source attribution, rights awareness, dynamic page density and publication safety.
 
 ---
 
@@ -86,6 +86,22 @@ Each edition receives its own Edition ID.
 Each edition is a new editorial snapshot, not an automatic continuation of the previous edition.
 
 ---
+
+### Release-to-release editorial window
+
+Mobile + Audio selection is release-driven rather than quantity-driven.
+
+Canonical slots:
+- 07:00
+- 13:00
+- 20:00
+
+Canonical release windows:
+- 07:00: previous day 20:00 → current day 07:00
+- 13:00: current day 07:00 → current day 13:00
+- 20:00: current day 13:00 → current day 20:00
+
+The system prioritizes information newly available since the previous release. The release window is a priority boundary, not an absolute exclusion boundary: older information may remain eligible when materially important or when it represents a significant development.
 
 ## 4. EDITORIAL SNAPSHOT
 
@@ -207,6 +223,17 @@ If the news cycle genuinely provides fewer publishable stories, editorial qualit
 
 ---
 
+### Adaptive release volume
+
+There is no fixed number of stories per release.
+
+The number of Mobile + Audio stories is determined by the actual qualifying information available for that release window.
+
+The system must never:
+- force-fill a release to a target count;
+- discard a qualifying important story solely because a target count was reached;
+- treat 30 stories, 25 stories, or any other numeric value as a canonical requirement.
+
 ## 8. GLOBAL COVERAGE
 
 A central production objective is:
@@ -296,6 +323,19 @@ Ranking should consider:
 The editorial engine must select a balanced edition, not simply the highest-scoring articles in isolation.
 
 ---
+
+### Release-window selection hierarchy
+
+For Mobile + Audio, selection priority is:
+
+1. New information since the previous release.
+2. Materially new developments of previously known stories.
+3. Editorial importance.
+4. Freshness.
+5. International relevance and impact.
+6. Soft geographic and thematic diversity.
+
+Diversity rules must not become hard exclusion rules for otherwise qualifying important events.
 
 ## 11. EDITORIAL PRODUCT
 
@@ -672,6 +712,16 @@ Memory must not become a blanket ban on later editorial reconsideration.
 
 ---
 
+### Release continuity
+
+Event Memory stores event observation and edition usage history.
+
+For release continuity:
+- unchanged events already used in an earlier edition are excluded from repeat Mobile + Audio publication;
+- materially changed developments may be selected when event identity/fingerprint changes;
+- edition history represents events actually used by an edition;
+- Event Memory does not determine editorial ranking and does not replace verification.
+
 ## 26. ARCHIVE
 
 Each edition must be reproducible.
@@ -864,6 +914,15 @@ The publication goal is:
 **Architecture:** ONE EDITION → MULTIPLE PRESENTATIONS
 
 ## CURRENT PRODUCTION STATUS — SEPTEMBER 2026
+### Release-to-release news collection
+
+The current editorial collection model is release-to-release for Mobile + Audio.
+
+The three daily releases use the previous release as the primary information boundary:
+20:00 → 07:00, 07:00 → 13:00, 13:00 → 20:00.
+
+Story count is fully adaptive and determined by the actual amount of new, important and fresh information.
+
 
 ### Production presentation standard
 

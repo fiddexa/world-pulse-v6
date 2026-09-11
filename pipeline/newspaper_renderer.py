@@ -505,7 +505,7 @@ def _paste(canvas, event, box, label):
 # MAIN
 # =====================================================================
 
-def render_newspaper(
+def _render_newspaper_legacy(
     edition: Any,
     output_path: str | Path,
     page_number: int = 1,
@@ -795,26 +795,32 @@ def render_newspaper(
         if isinstance(event, dict)
     ]
 
-    # Page 01 follows exactly the same text-first visual language
-    # as the rest of the Full Edition.
-    feed_events = ordered[:6]
+    # Page 01 is intentionally the same text-first news feed
+    # as the later Full Edition pages.
+    feed_events = ordered[:5]
 
     feed_top = y
+    feed_bottom = 1580
 
-    # Footer begins below this working area.
-    feed_bottom = 1585
-
-    card_gap = 16
-    card_height = 185
+    card_gap = 18
+    card_height = 210
 
     for index, event in enumerate(feed_events):
 
         card_top = (
             feed_top
-            + index * (card_height + card_gap)
+            + index
+            * (
+                card_height
+                + card_gap
+            )
         )
 
-        if card_top + card_height > feed_bottom:
+        if (
+            card_top
+            + card_height
+            > feed_bottom
+        ):
             break
 
         card_bottom = (
@@ -822,21 +828,20 @@ def render_newspaper(
             + card_height
         )
 
-        # ------------------------------------------------------------
         # CATEGORY BAR
-        # ------------------------------------------------------------
-
         draw.rectangle(
             (
                 MARGIN,
                 card_top,
                 WIDTH - MARGIN,
-                card_top + 36,
+                card_top + 38,
             ),
             fill=BLACK,
         )
 
-        category = _v6_category(event)
+        category = _v6_category(
+            event
+        )
 
         draw.text(
             (
@@ -844,16 +849,24 @@ def render_newspaper(
                 card_top + 7,
             ),
             category.upper(),
-            font=_font(15, bold=True),
+            font=_font(
+                15,
+                bold=True,
+            ),
             fill=WHITE,
         )
 
-        number_text = f"{index + 1:02d}"
+        number_text = (
+            f"{index + 1:02d}"
+        )
 
         bbox = draw.textbbox(
             (0, 0),
             number_text,
-            font=_font(15, bold=True),
+            font=_font(
+                15,
+                bold=True,
+            ),
         )
 
         draw.text(
@@ -861,39 +874,45 @@ def render_newspaper(
                 WIDTH
                 - MARGIN
                 - 16
-                - (bbox[2] - bbox[0]),
+                - (
+                    bbox[2]
+                    - bbox[0]
+                ),
                 card_top + 7,
             ),
             number_text,
-            font=_font(15, bold=True),
+            font=_font(
+                15,
+                bold=True,
+            ),
             fill=RED,
         )
 
-        # ------------------------------------------------------------
-        # HEADLINE
-        # ------------------------------------------------------------
-
-        cursor = card_top + 49
+        # CONTENT
+        cursor = card_top + 51
 
         title_end = _draw_block(
             draw,
             _v6_title(event),
             MARGIN + 16,
             cursor,
-            _font(23, bold=True),
+            _font(
+                24,
+                bold=True,
+            ),
             BLACK,
             CONTENT_WIDTH - 32,
             max_lines=2,
             spacing=3,
         )
 
-        cursor = title_end + 5
+        cursor = title_end + 6
 
         draw.line(
             (
                 MARGIN + 16,
                 cursor,
-                MARGIN + 92,
+                MARGIN + 96,
                 cursor,
             ),
             fill=RED,
@@ -902,11 +921,9 @@ def render_newspaper(
 
         cursor += 9
 
-        # ------------------------------------------------------------
-        # SUMMARY
-        # ------------------------------------------------------------
-
-        summary = _v6_summary(event)
+        summary = _v6_summary(
+            event
+        )
 
         if summary:
             _draw_block(
@@ -914,27 +931,28 @@ def render_newspaper(
                 summary,
                 MARGIN + 16,
                 cursor,
-                _font(13),
+                _font(14),
                 GRAY,
                 CONTENT_WIDTH - 32,
-                max_lines=2,
+                max_lines=3,
                 spacing=3,
             )
 
-        # ------------------------------------------------------------
-        # SOURCE
-        # ------------------------------------------------------------
-
-        sources = _v6_sources(event)
+        sources = _v6_sources(
+            event
+        )
 
         if sources:
             draw.text(
                 (
                     MARGIN + 16,
-                    card_bottom - 30,
+                    card_bottom - 31,
                 ),
                 "SOURCE",
-                font=_font(9, bold=True),
+                font=_font(
+                    10,
+                    bold=True,
+                ),
                 fill=RED,
             )
 
@@ -944,7 +962,7 @@ def render_newspaper(
                     card_bottom - 17,
                 ),
                 sources,
-                font=_font(9),
+                font=_font(10),
                 fill=GRAY,
             )
 
@@ -2956,11 +2974,10 @@ LAST_PAGE_LOGO = Path(
 )
 
 LAST_PAGE_FREE_SPACE_THRESHOLD = 0.25
-LAST_PAGE_COMPACT_MAX = 0.40
-LAST_PAGE_STANDARD_MAX = 0.55
+LAST_PAGE_LEGAL_ONLY_THRESHOLD = 0.05
 
 LAST_PAGE_FOOTER_TOP = 1720
-LAST_PAGE_BLOCK_GAP = 24
+LAST_PAGE_BLOCK_GAP = 22
 
 INFO_RIGHTS_POLICY = (
     "We gather information from publicly available and reputable news "
@@ -2983,52 +3000,139 @@ PUBLICATION_NOTICE = (
 )
 
 
+def _draw_last_page_legal_only(
+    draw,
+    *,
+    top,
+    width,
+    height,
+):
+    """Small legal transparency notice for 5%–25% free space."""
+
+    if height < 70:
+        return False
+
+    heading_font = _font(13, bold=True)
+    body_font = _font(10)
+
+    cursor = top
+
+    draw.text(
+        (MARGIN, cursor),
+        "INFORMATION & RIGHTS POLICY",
+        font=heading_font,
+        fill=RED,
+    )
+
+    cursor += 22
+
+    text = (
+        "Information is gathered from publicly available and reputable "
+        "sources and independently edited for clarity and context. "
+        "Third-party names, trademarks and protected materials remain "
+        "the property of their respective owners. Attribution does not "
+        "imply endorsement, affiliation or a license to reproduce "
+        "third-party content."
+    )
+
+    _draw_block(
+        draw,
+        text,
+        MARGIN,
+        cursor,
+        body_font,
+        GRAY,
+        width,
+        max_lines=5,
+        spacing=2,
+    )
+
+    return True
+
+
 def _draw_last_page_brand_block(
     canvas,
     draw,
     *,
-    free_height,
+    last_content_bottom,
 ):
     """
-    Draw a branding/legal block only when the final page has
-    approximately 30% or more usable empty space.
+    Add the final-page branding/legal block according to the
+    actual remaining content area.
 
-    Size is selected automatically from the available space.
+    <5%      -> nothing
+    5–25%    -> legal text only
+    25–40%   -> compact
+    40–55%   -> standard
+    >55%     -> large
     """
 
-    if free_height <= 0:
+    available_area = max(
+        1,
+        LAST_PAGE_FOOTER_TOP - 330,
+    )
+
+    free_height = max(
+        0,
+        LAST_PAGE_FOOTER_TOP
+        - LAST_PAGE_BLOCK_GAP
+        - last_content_bottom,
+    )
+
+    free_ratio = free_height / available_area
+
+    if free_ratio < LAST_PAGE_LEGAL_ONLY_THRESHOLD:
         return False
 
-    free_ratio = free_height / HEIGHT
+    # ------------------------------------------------------------
+    # LEGAL ONLY: 5%–25%
+    # ------------------------------------------------------------
 
     if free_ratio < LAST_PAGE_FREE_SPACE_THRESHOLD:
-        return False
 
-    if free_ratio < LAST_PAGE_COMPACT_MAX:
+        legal_top = (
+            last_content_bottom
+            + LAST_PAGE_BLOCK_GAP
+        )
+
+        return _draw_last_page_legal_only(
+            draw,
+            top=legal_top,
+            width=CONTENT_WIDTH,
+            height=free_height - LAST_PAGE_BLOCK_GAP,
+        )
+
+    # ------------------------------------------------------------
+    # SELECT VARIANT
+    # ------------------------------------------------------------
+
+    if free_ratio < 0.40:
         variant = "COMPACT"
         logo_width = 460
-        title_size = 22
+        box_height = 245
+        title_size = 21
         body_size = 11
-        box_height = 250
-    elif free_ratio < LAST_PAGE_STANDARD_MAX:
+
+    elif free_ratio < 0.55:
         variant = "STANDARD"
         logo_width = 680
+        box_height = 350
         title_size = 28
         body_size = 13
-        box_height = 350
+
     else:
         variant = "LARGE"
         logo_width = 900
+        box_height = 470
         title_size = 34
         body_size = 15
-        box_height = 475
 
-    available_width = CONTENT_WIDTH
+    # ------------------------------------------------------------
+    # LOAD LOGO
+    # ------------------------------------------------------------
 
-    logo_width = min(
-        logo_width,
-        available_width,
-    )
+    if not LAST_PAGE_LOGO.exists():
+        return False
 
     try:
         logo = Image.open(
@@ -3037,14 +3141,28 @@ def _draw_last_page_brand_block(
     except Exception:
         return False
 
+    logo_width = min(
+        logo_width,
+        CONTENT_WIDTH,
+    )
+
     logo_height = int(
         logo.height
         * logo_width
         / logo.width
     )
 
-    if logo_height > box_height - 95:
-        logo_height = box_height - 95
+    # Reduce logo when actual free space is tighter.
+    max_logo_height = max(
+        90,
+        min(
+            logo_height,
+            box_height - 100,
+        ),
+    )
+
+    if max_logo_height != logo_height:
+        logo_height = max_logo_height
         logo_width = int(
             logo.width
             * logo_height
@@ -3056,53 +3174,76 @@ def _draw_last_page_brand_block(
         Image.Resampling.LANCZOS,
     )
 
-    box_top = (
-        LAST_PAGE_FOOTER_TOP
-        - free_height
+    # ------------------------------------------------------------
+    # POSITION
+    # ------------------------------------------------------------
+
+    block_top = (
+        last_content_bottom
         + LAST_PAGE_BLOCK_GAP
     )
 
-    box_left = MARGIN
-    box_width = CONTENT_WIDTH
+    max_bottom = (
+        LAST_PAGE_FOOTER_TOP
+        - 10
+    )
 
-    # Keep the block inside the actual available area.
-    max_bottom = LAST_PAGE_FOOTER_TOP - 10
     box_bottom = min(
-        box_top + box_height,
+        block_top + box_height,
         max_bottom,
     )
 
-    actual_height = box_bottom - box_top
+    actual_height = (
+        box_bottom
+        - block_top
+    )
 
     if actual_height < logo_height + 70:
         return False
 
-    # Divider above branding block.
+    # ------------------------------------------------------------
+    # DIVIDER
+    # ------------------------------------------------------------
+
     draw.line(
         (
-            box_left,
-            box_top,
-            box_left + box_width,
-            box_top,
+            MARGIN,
+            block_top,
+            WIDTH - MARGIN,
+            block_top,
         ),
         fill=RED,
         width=2,
     )
 
     logo_x = (
-        box_left
-        + (box_width - logo_width) // 2
+        MARGIN
+        + (
+            CONTENT_WIDTH
+            - logo_width
+        ) // 2
     )
 
-    logo_y = box_top + 12
+    logo_y = block_top + 10
 
     canvas.paste(
         logo,
-        (logo_x, logo_y),
+        (
+            logo_x,
+            logo_y,
+        ),
         logo,
     )
 
-    cursor = logo_y + logo_height + 8
+    cursor = (
+        logo_y
+        + logo_height
+        + 8
+    )
+
+    # ------------------------------------------------------------
+    # TEXT
+    # ------------------------------------------------------------
 
     heading_font = _font(
         title_size,
@@ -3114,24 +3255,19 @@ def _draw_last_page_brand_block(
         bold=False,
     )
 
-    small_font = _font(
-        max(10, body_size - 2),
-        bold=False,
-    )
-
-    # Compact version keeps only the essential legal notice.
     if variant == "COMPACT":
+
         cursor = _draw_block(
             draw,
             "INFORMATION & RIGHTS POLICY",
-            box_left,
+            MARGIN,
             cursor,
             _font(
                 max(12, body_size),
                 bold=True,
             ),
             RED,
-            box_width,
+            CONTENT_WIDTH,
             max_lines=1,
             spacing=2,
         )
@@ -3139,52 +3275,50 @@ def _draw_last_page_brand_block(
         cursor += 3
 
         compact_text = (
-            "Information is gathered from publicly available sources, "
-            "independently edited for clarity and attributed where applicable. "
+            "Information is gathered from publicly available sources "
+            "and independently edited for clarity and context. "
             "Third-party rights remain with their respective owners."
         )
 
         _draw_block(
             draw,
             compact_text,
-            box_left,
+            MARGIN,
             cursor,
             body_font,
             GRAY,
-            box_width,
+            CONTENT_WIDTH,
             max_lines=3,
             spacing=2,
         )
 
     else:
-        # Standard / Large include full policy.
+
         cursor = _draw_block(
             draw,
             "MORE THAN NEWS. A WIDER PERSPECTIVE.",
-            box_left,
+            MARGIN,
             cursor,
             heading_font,
             BLACK,
-            box_width,
+            CONTENT_WIDTH,
             max_lines=1,
             spacing=3,
         )
 
-        cursor += 8
-
-        policy_width = box_width
+        cursor += 7
 
         cursor = _draw_block(
             draw,
             "INFORMATION & RIGHTS POLICY",
-            box_left,
+            MARGIN,
             cursor,
             _font(
                 max(13, body_size),
                 bold=True,
             ),
             RED,
-            policy_width,
+            CONTENT_WIDTH,
             max_lines=1,
             spacing=2,
         )
@@ -3194,11 +3328,11 @@ def _draw_last_page_brand_block(
         cursor = _draw_block(
             draw,
             INFO_RIGHTS_POLICY,
-            box_left,
+            MARGIN,
             cursor,
             body_font,
             GRAY,
-            policy_width,
+            CONTENT_WIDTH,
             max_lines=4 if variant == "STANDARD" else 5,
             spacing=2,
         )
@@ -3208,40 +3342,31 @@ def _draw_last_page_brand_block(
         cursor = _draw_block(
             draw,
             INFO_RIGHTS_POLICY_2,
-            box_left,
+            MARGIN,
             cursor,
             body_font,
             GRAY,
-            policy_width,
+            CONTENT_WIDTH,
             max_lines=3 if variant == "STANDARD" else 4,
             spacing=2,
         )
 
         if variant == "LARGE":
-            cursor += 6
+            cursor += 5
 
             _draw_block(
                 draw,
                 PUBLICATION_NOTICE,
-                box_left,
+                MARGIN,
                 cursor,
-                small_font,
+                _font(
+                    max(10, body_size - 2)
+                ),
                 BLACK,
-                policy_width,
+                CONTENT_WIDTH,
                 max_lines=3,
                 spacing=2,
             )
-
-    # Variant marker is deliberately subtle.
-    draw.text(
-        (
-            box_left + box_width - 105,
-            box_bottom - 25,
-        ),
-        variant,
-        font=_font(9, bold=True),
-        fill=LIGHT_GRAY,
-    )
 
     return True
 
@@ -3281,6 +3406,10 @@ def render_section_page(edition, page, output_path, *, page_number=None, page_pl
             "NO PUBLISHED STORIES", font=_font(22, bold=True), fill=GRAY,
         )
 
+    # ============================================================
+    # LAST PAGE INFORMATION / RIGHTS BLOCK
+    # ============================================================
+
     if is_last_page:
         if page_plan.blocks:
             last_content_bottom = max(
@@ -3290,19 +3419,377 @@ def render_section_page(edition, page, output_path, *, page_number=None, page_pl
         else:
             last_content_bottom = geometry.content_top
 
-        free_height = max(
-            0,
-            LAST_PAGE_FOOTER_TOP
-            - LAST_PAGE_BLOCK_GAP
-            - last_content_bottom,
-        )
-
         _draw_last_page_brand_block(
             canvas,
             draw,
-            free_height=free_height,
+            last_content_bottom=last_content_bottom,
         )
 
     _v6_footer(draw)
     canvas.save(output, quality=95)
+    return output
+
+
+# =====================================================================
+# DEFINITIVE PAGE 01 RENDERER
+# =====================================================================
+
+def render_newspaper(
+    edition,
+    output_path,
+    page_number=1,
+):
+    """
+    Final Page 01 renderer.
+
+    Page 01 intentionally uses the same text-first news-card language
+    as Pages 02+ while retaining the established Page 01 footer asset.
+
+    No story images are used.
+    """
+
+    if not isinstance(edition, dict):
+        raise ValueError("edition must be a dictionary")
+
+    output = Path(output_path)
+    output.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    canvas = Image.new(
+        "RGB",
+        (WIDTH, HEIGHT),
+        WHITE,
+    )
+
+    draw = ImageDraw.Draw(canvas)
+
+    # ------------------------------------------------------------
+    # HEADER
+    # ------------------------------------------------------------
+
+    _v6_header(
+        canvas,
+        draw,
+        edition,
+        int(page_number or 1),
+    )
+
+    # ------------------------------------------------------------
+    # NEWS FEED
+    # ------------------------------------------------------------
+
+    ordered = [
+        event
+        for event in _list(
+            edition.get("ordered")
+        )
+        if isinstance(event, dict)
+    ]
+
+    events = ordered[:5]
+
+    content_top = 330
+
+    # Existing Page 01 footer asset begins approximately at this
+    # vertical area. Leave it untouched.
+    content_bottom = 1570
+
+    card_gap = 18
+
+    # Five cards, matching the visual density of Pages 02+.
+    available_height = (
+        content_bottom
+        - content_top
+        - card_gap * (len(events) - 1)
+    )
+
+    card_height = (
+        max(
+            175,
+            int(
+                available_height
+                / max(1, len(events))
+            ),
+        )
+        if events
+        else 0
+    )
+
+    for index, event in enumerate(events):
+
+        card_top = (
+            content_top
+            + index
+            * (
+                card_height
+                + card_gap
+            )
+        )
+
+        card_bottom = (
+            card_top
+            + card_height
+        )
+
+        if card_bottom > content_bottom:
+            break
+
+        # --------------------------------------------------------
+        # CATEGORY BAR
+        # --------------------------------------------------------
+
+        draw.rectangle(
+            (
+                MARGIN,
+                card_top,
+                WIDTH - MARGIN,
+                card_top + 38,
+            ),
+            fill=BLACK,
+        )
+
+        category = _v6_category(
+            event
+        )
+
+        draw.text(
+            (
+                MARGIN + 16,
+                card_top + 7,
+            ),
+            category.upper(),
+            font=_font(
+                15,
+                bold=True,
+            ),
+            fill=WHITE,
+        )
+
+        number = f"{index + 1:02d}"
+
+        bbox = draw.textbbox(
+            (0, 0),
+            number,
+            font=_font(
+                15,
+                bold=True,
+            ),
+        )
+
+        draw.text(
+            (
+                WIDTH
+                - MARGIN
+                - 16
+                - (
+                    bbox[2]
+                    - bbox[0]
+                ),
+                card_top + 7,
+            ),
+            number,
+            font=_font(
+                15,
+                bold=True,
+            ),
+            fill=RED,
+        )
+
+        # --------------------------------------------------------
+        # TEXT
+        # --------------------------------------------------------
+
+        text_x = MARGIN + 16
+        text_width = CONTENT_WIDTH - 32
+
+        cursor = card_top + 50
+
+        title_end = _draw_block(
+            draw,
+            _v6_title(event),
+            text_x,
+            cursor,
+            _font(
+                24,
+                bold=True,
+            ),
+            BLACK,
+            text_width,
+            max_lines=2,
+            spacing=3,
+        )
+
+        cursor = title_end + 6
+
+        draw.line(
+            (
+                text_x,
+                cursor,
+                min(
+                    text_x + 82,
+                    text_x + text_width,
+                ),
+                cursor,
+            ),
+            fill=RED,
+            width=3,
+        )
+
+        cursor += 9
+
+        summary = _v6_summary(
+            event
+        )
+
+        if summary:
+            _draw_block(
+                draw,
+                summary,
+                text_x,
+                cursor,
+                _font(14),
+                GRAY,
+                text_width,
+                max_lines=3,
+                spacing=3,
+            )
+
+        sources = _v6_sources(
+            event
+        )
+
+        if sources:
+            draw.text(
+                (
+                    text_x,
+                    card_bottom - 31,
+                ),
+                "SOURCE",
+                font=_font(
+                    10,
+                    bold=True,
+                ),
+                fill=RED,
+            )
+
+            draw.text(
+                (
+                    text_x,
+                    card_bottom - 17,
+                ),
+                sources,
+                font=_font(10),
+                fill=GRAY,
+            )
+
+        draw.rectangle(
+            (
+                MARGIN,
+                card_top,
+                WIDTH - MARGIN,
+                card_bottom,
+            ),
+            outline=BLACK,
+            width=2,
+        )
+
+    # ------------------------------------------------------------
+    # EXISTING PAGE 01 FOOTER / MARKETS AREA
+    # ------------------------------------------------------------
+
+    footer_path = Path(
+        "assets/footer.png"
+    )
+
+    footer_pages_path = Path(
+        "assets/footer-pages.png"
+    )
+
+    if footer_path.exists() and footer_pages_path.exists():
+
+        footer_img = Image.open(
+            footer_path
+        ).convert("RGBA")
+
+        footer_pages_img = Image.open(
+            footer_pages_path
+        ).convert("RGBA")
+
+        footer_width = WIDTH
+
+        footer_height = int(
+            footer_img.height
+            * footer_width
+            / footer_img.width
+        )
+
+        footer_img = footer_img.resize(
+            (
+                footer_width,
+                footer_height,
+            ),
+            Image.Resampling.LANCZOS,
+        )
+
+        footer_pages_height = int(
+            footer_pages_img.height
+            * footer_width
+            / footer_pages_img.width
+        )
+
+        footer_pages_img = footer_pages_img.resize(
+            (
+                footer_width,
+                footer_pages_height,
+            ),
+            Image.Resampling.LANCZOS,
+        )
+
+        footer_y = (
+            HEIGHT
+            - footer_height
+            - footer_pages_height
+        )
+
+        draw.line(
+            (
+                MARGIN,
+                footer_y - 8,
+                WIDTH - MARGIN,
+                footer_y - 8,
+            ),
+            fill=BLACK,
+            width=3,
+        )
+
+        canvas.paste(
+            footer_img,
+            (
+                0,
+                footer_y,
+            ),
+            footer_img,
+        )
+
+        canvas.paste(
+            footer_pages_img,
+            (
+                0,
+                HEIGHT - footer_pages_height,
+            ),
+            footer_pages_img,
+        )
+
+    else:
+        # Safe fallback if footer assets are unavailable.
+        _v6_footer(draw)
+
+    canvas.save(
+        output,
+        format="PNG",
+        optimize=True,
+    )
+
     return output
