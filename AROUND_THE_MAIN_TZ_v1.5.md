@@ -29,14 +29,44 @@ The system must produce an independent editorial product rather than mechanicall
 
 For every approved production edition, Telegram publication follows this mandatory sequence:
 
-
+APPROVED
+   ↓
+BUILD EDITION
+   ↓
+PUBLISH TEXT TO TELEGRAM
+   ↓
+TEXT DELIVERY CONFIRMED
+   ↓
+GENERATE AUDIO EDITION
+   ↓
+PUBLISH AUDIO TO TELEGRAM
 
 The Audio Edition must never be generated or published before the text publication step has been successfully completed or confirmed as already completed.
 
 The text delivery state is the gate for the Audio stage.
 
+For a first successful publication:
+
+TEXT = SENT
+   ↓
+AUDIO = GENERATED
+   ↓
+AUDIO = SENT
+
+For a repeated or restarted production run:
+
+TEXT = SKIPPED
+   ↓
+TEXT ALREADY PUBLISHED
+   ↓
+AUDIO MAY CONTINUE
+
+The text and Audio outputs must belong to the same `Edition ID` and the same edition number.
+
 Canonical Audio Telegram caption:
 
+AROUND THE MAIN — EDITION 0114
+Audio Edition
 
 
 ---
