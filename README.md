@@ -857,3 +857,89 @@ Editorial rule:
 8. Use Event Memory to prevent unchanged repetition across releases.
 9. Mobile and Audio must consume the same selected event set.
 10. Full Edition remains outside the current Mobile + Audio implementation scope.
+
+
+---
+
+## Current Production State — September 2026
+
+The project is currently being finalized on branch `approval-gate`.
+
+### Release model
+
+AROUND THE MAIN uses release-to-release editorial comparison:
+
+`07:00 ← 20:00 previous release`  
+`13:00 ← 07:00 same day`  
+`20:00 ← 13:00 same day`
+
+The release window is a priority boundary rather than a hard cutoff.
+Story count is adaptive.
+
+EventMemory keeps an approximately 30-day history horizon. Published
+edition history records only events actually used in the final ordered
+edition.
+
+### Mobile
+
+Mobile uses the canonical ordered list:
+
+`mobile_audio["events"]`
+
+This prevents duplicate rendering from presentation subsets such as
+`top_story`, `main_stories`, and `briefs`.
+
+Pagination is content-driven and stories are never split between pages.
+
+Every page displays the edition date. When the explicit date field is
+missing, the renderer derives it from `edition_id`.
+
+SOURCE is rendered in normal text flow:
+
+`summary → SOURCE → source name → card bottom`
+
+This prevents SOURCE from overlapping the summary.
+
+### Last page
+
+The last Mobile page uses remaining free space for branding only when it
+can be done cleanly.
+
+The INFO block is always the same content and visual element:
+italic, non-bold, smaller type, compact line spacing.
+
+The renderer chooses the largest of six banner sizes that fits completely
+with INFO.
+
+When a banner does not fit but the complete INFO block does, INFO alone is
+shown. When even the complete INFO block does not fit, nothing is shown.
+
+Aesthetic integrity takes priority over forcing content into every release.
+
+### Audio
+
+Audio uses the same selected Mobile event sequence and the same order.
+
+The edition number remains in the Audio introduction so each release can
+be identified by edition number.
+
+### Publishing
+
+The final production architecture is:
+
+`collector → editorial selection → Mobile → Audio → Telegram → X`
+
+Publishing credentials belong in GitHub Actions Secrets.
+
+The X integration will be configured and tested before the development
+Codespace is deleted.
+
+After successful end-to-end testing, the Codespace is no longer required.
+The GitHub repository and GitHub Actions continue to operate independently.
+
+### Verified development checkpoints
+
+- `8740cb9` — last-page branding and SOURCE checkpoint
+- `8dc1752` — SOURCE flow, date fallback, and adaptive last-page branding
+
+Do not add backup files or `test_output/` artifacts to production commits.

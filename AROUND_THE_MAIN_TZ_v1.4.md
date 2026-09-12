@@ -1048,3 +1048,154 @@ The production goal remains:
 ACCURATE + INTERNATIONAL + FAST + STABLE
 
 Three editions per day.
+
+
+---
+
+# CURRENT VERIFIED IMPLEMENTATION — SEPTEMBER 2026
+
+This section records the currently approved production decisions and
+verified behavior for AROUND THE MAIN.
+
+## Editorial release model
+
+Editions are built release-to-release:
+
+- 07:00 edition uses the previous 20:00 release as its comparison/reference boundary.
+- 13:00 edition uses the previous 07:00 release.
+- 20:00 edition uses the previous 13:00 release.
+
+The release window is a priority boundary, not a hard cutoff. Older
+materially important developments may remain eligible.
+
+Story count is adaptive. There is no fixed target, minimum, or maximum
+number of Mobile/Audio stories.
+
+EventMemory has an approximately 30-day history horizon. This is a memory
+storage horizon, not a story-count rule.
+
+Only events actually included in the final ordered edition are recorded
+as published edition history.
+
+## Mobile and Audio
+
+Mobile and Audio use the same canonical selected event sequence:
+`mobile_audio["events"]`.
+
+The renderer must never concatenate `top_story`, `main_stories`,
+`briefs`, and `events` as separate story pools. The canonical `events`
+list is authoritative.
+
+Mobile and Audio therefore use the same stories in the same order.
+
+The edition number remains spoken in Audio, because it identifies the
+release number.
+
+## Mobile pagination
+
+Mobile pagination is content-driven.
+
+- Stories are never split between pages.
+- Card height is calculated from the same typography used during final drawing.
+- Page count is adaptive.
+- There is no fixed number of stories per page.
+
+## Mobile SOURCE layout
+
+The SOURCE block is part of the normal text flow.
+
+The required order is:
+
+1. headline;
+2. summary;
+3. small gap;
+4. `SOURCE`;
+5. source name;
+6. bottom padding;
+7. card bottom border.
+
+SOURCE must never be anchored independently to the bottom of the card in
+a way that can overlap the summary.
+
+Card height must reserve the complete space required by summary + SOURCE.
+
+## Mobile date
+
+Every Mobile page displays the edition date.
+
+When an explicit edition date is unavailable, the renderer derives the date
+from the production `edition_id` format:
+
+`AROUND-THE-MAIN-EN-YYYY-MM-DD-HHMM`
+
+The display format is `DD MON YYYY`, for example `11 SEP 2026`.
+
+## Last-page branding
+
+The final Mobile page may use otherwise unused vertical space after the
+last story.
+
+The goal is visual balance, not mandatory placement of branding.
+
+The information block is identical whether or not a banner is present.
+
+The information block is:
+
+- italic;
+- non-bold;
+- smaller than normal story text;
+- compact line spacing;
+- never truncated.
+
+The last-page decision logic is:
+
+- if there is enough space for banner + complete INFO, render both;
+- otherwise, if the complete INFO block fits, render INFO only;
+- if the complete INFO block does not fit, render nothing.
+
+The banner uses six adaptive sizes and the largest size that physically
+fits together with the complete INFO block is selected.
+
+The banner must never overlap the footer.
+
+## International relevance gate
+
+For Mobile/Audio, official UK and Canadian government sources are subject
+to an international-relevance gate.
+
+A government-source story is retained only when the headline/summary
+contains direct evidence of international relevance.
+
+Aggregated actor/affected-area metadata alone is not sufficient evidence,
+because clustered events can contain background references that do not
+make a story itself international.
+
+Domestic government stories are therefore excluded from Mobile/Audio.
+
+## Publishing architecture
+
+The intended production flow is:
+
+collection → editorial selection → Mobile → Audio → Telegram → X.
+
+External credentials for publishing are stored as GitHub Actions Secrets,
+not inside the Codespace or source files.
+
+X publication is configured and fully tested before the development
+Codespace is deleted.
+
+Once code, workflows, secrets, and automatic publication have been
+successfully tested, the Codespace may be stopped or deleted.
+
+The GitHub repository and GitHub Actions remain the production system;
+the Codespace is only a development environment.
+
+## Current verified checkpoints
+
+`8740cb9` — Mobile last-page branding and source-layout checkpoint.
+
+`8dc1752` — Mobile SOURCE flow, edition date fallback, and adaptive
+last-page branding verified visually.
+
+These checkpoints are part of the recovery history and must not be
+replaced by ad-hoc rewrites.
