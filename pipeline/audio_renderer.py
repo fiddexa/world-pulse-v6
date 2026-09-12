@@ -74,7 +74,7 @@ class PiperTTSRenderer:
         ffmpeg_binary: str | None = None,
         sentence_silence: float = 0.30,
         noise_w: float = 0.0,
-        length_scale: float = 0.65,
+        length_scale: float = 0.75,
         bitrate: str = "128k",
         timeout: int = 300,
     ) -> None:

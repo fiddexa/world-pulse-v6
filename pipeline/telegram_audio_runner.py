@@ -21,6 +21,9 @@ def _telegram_send_audio(
     *,
     chat_id: str,
     audio_path: str,
+    caption: str = "",
+    title: str = "AROUND THE MAIN",
+    performer: str = "AROUND THE MAIN",
 ) -> dict:
     """Send an MP3 file through the Telegram Bot API."""
 
@@ -43,7 +46,12 @@ def _telegram_send_audio(
 
     fields = {
         "chat_id": str(chat_id),
+        "title": str(title),
+        "performer": str(performer),
     }
+
+    if caption:
+        fields["caption"] = str(caption)
 
     body = bytearray()
 
@@ -117,9 +125,13 @@ def publish_edition_audio_to_telegram(
     edition_id: str,
     audio_path: str | Path,
     *,
+    edition_number=None,
     approval_manifest_path=None,
     transport=None,
     chat_id=None,
+    caption=None,
+    title=None,
+    performer="AROUND THE MAIN",
 ):
     """Publish one approved edition audio file through an injected transport."""
 
@@ -178,9 +190,30 @@ def publish_edition_audio_to_telegram(
             "edition_id": edition_id,
         }
 
+    if caption is None:
+        if edition_number is not None:
+            try:
+                number = int(edition_number)
+            except (TypeError, ValueError):
+                return {
+                    "status": "FAILED",
+                    "edition_id": edition_id,
+                    "reason": "INVALID_EDITION_NUMBER",
+                }
+
+            caption = (
+                f"AROUND THE MAIN — EDITION {number:04d}\n"
+                "Audio Edition"
+            )
+        else:
+            caption = ""
+
     response = transport(
         chat_id=chat_id,
         audio_path=str(audio_file),
+        caption=str(caption),
+        title=str(title or "AROUND THE MAIN"),
+        performer=str(performer),
     )
 
     if isinstance(response, dict) and response.get("ok") is True:

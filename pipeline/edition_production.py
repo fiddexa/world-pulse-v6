@@ -20,6 +20,9 @@ from pipeline.edition_publication import build_edition_publication
 from pipeline.edition_telegram_runner import (
     publish_edition_to_telegram,
 )
+from pipeline.telegram_audio_runner import (
+    publish_edition_audio_to_telegram,
+)
 from pipeline.audio_script import build_audio_script
 from pipeline.audio_renderer import OpenAITTSRenderer
 from pipeline.edition_audio import generate_edition_audio
@@ -99,6 +102,7 @@ def publish_edition(
     approval_manifest_path=None,
     audio_renderer=None,
     audio_output_dir="data/audio",
+    audio_publisher=None,
 ) -> dict:
     """
     Build and publish one AROUND THE MAIN edition.
@@ -137,12 +141,30 @@ def publish_edition(
             "reason": "INVALID_PUBLICATION",
         }
 
-    # Real production editions receive an edition_number from the
-    # production scheduler. For those editions, Audio is mandatory.
-    #
-    # Legacy/minimal test fixtures may not contain edition_number.
-    # They keep the historical text-delivery behavior so the existing
-    # production tests remain valid.
+    # Text publication always happens first.
+    delivery = publish_edition_to_telegram(
+        publication,
+        log=log,
+        publisher=publisher,
+        approval_manifest_path=approval_manifest_path,
+    )
+
+    # Audio is generated only after the text edition has been successfully
+    # published (or was already published and therefore skipped by the
+    # edition-level idempotency layer).
+    if delivery.get("status") not in {"SENT", "SKIPPED"}:
+        return {
+            "status": delivery.get("status", FAILED),
+            "edition_id": publication.get("edition_id"),
+            "publication": publication,
+            "audio": {
+                "status": "SKIPPED",
+                "edition_id": publication.get("edition_id"),
+                "reason": "TEXT_PUBLICATION_NOT_CONFIRMED",
+            },
+            "delivery": delivery,
+        }
+
     if edition.get("edition_number") is not None:
         audio_result = generate_edition_audio(
             edition,
@@ -157,21 +179,41 @@ def publish_edition(
                 "edition_id": publication.get("edition_id"),
                 "publication": publication,
                 "audio": audio_result,
-                "delivery": None,
+                "audio_delivery": None,
+                "delivery": delivery,
             }
-    else:
-        audio_result = {
-            "status": "SKIPPED",
+
+        audio_sender = (
+            audio_publisher
+            if audio_publisher is not None
+            else publish_edition_audio_to_telegram
+        )
+
+        audio_delivery = audio_sender(
+            publication.get("edition_id"),
+            audio_result.get("audio_path"),
+            edition_number=edition.get("edition_number"),
+            approval_manifest_path=approval_manifest_path,
+        )
+
+        return {
+            "status": (
+                COMPLETED
+                if audio_delivery.get("status") == "SENT"
+                else audio_delivery.get("status", FAILED)
+            ),
             "edition_id": publication.get("edition_id"),
-            "reason": "MISSING_EDITION_NUMBER",
+            "publication": publication,
+            "audio": audio_result,
+            "audio_delivery": audio_delivery,
+            "delivery": delivery,
         }
 
-    delivery = publish_edition_to_telegram(
-        publication,
-        log=log,
-        publisher=publisher,
-        approval_manifest_path=approval_manifest_path,
-    )
+    audio_result = {
+        "status": "SKIPPED",
+        "edition_id": publication.get("edition_id"),
+        "reason": "MISSING_EDITION_NUMBER",
+    }
 
     return {
         "status": (
@@ -182,5 +224,6 @@ def publish_edition(
         "edition_id": publication.get("edition_id"),
         "publication": publication,
         "audio": audio_result,
+        "audio_delivery": None,
         "delivery": delivery,
     }

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pipeline.edition_production import (
     COMPLETED,
     FAILED,
@@ -191,5 +193,92 @@ def test_failed_delivery_does_not_report_completed(tmp_path):
 
     assert result["status"] == "FAILED"
     assert result["delivery"]["status"] == "FAILED"
+
+    log.close()
+
+def test_publish_edition_text_before_audio(tmp_path, monkeypatch):
+    from tests.conftest import create_approved_manifest
+    import pipeline.edition_production as production
+
+    item = edition()
+    item["edition_number"] = 114
+
+    publisher = MockPublisher()
+    log = SQLiteEditionDeliveryLog(":memory:")
+
+    approval_manifest = create_approved_manifest(
+        tmp_path,
+        item["edition_id"],
+    )
+
+    calls = []
+
+    def fake_generate_audio(
+        edition,
+        *,
+        output_dir,
+        audio_renderer=None,
+    ):
+        calls.append("audio_generate")
+        audio_path = tmp_path / "EDITION_0114.mp3"
+        audio_path.write_bytes(b"fake-audio")
+
+        return {
+            "status": "GENERATED",
+            "edition_id": edition["edition_id"],
+            "audio_path": str(audio_path),
+        }
+
+    def fake_audio_publish(
+        edition_id,
+        audio_path,
+        *,
+        edition_number,
+        approval_manifest_path,
+    ):
+        calls.append(
+            f"audio_publish:{edition_number}"
+        )
+
+        assert calls[0] == "text_publish"
+        assert Path(audio_path).is_file()
+
+        return {
+            "status": "SENT",
+            "edition_id": edition_id,
+            "message_id": 789,
+        }
+
+    class OrderedPublisher(MockPublisher):
+        def publish(self, event):
+            calls.append("text_publish")
+            return super().publish(event)
+
+    publisher = OrderedPublisher()
+
+    monkeypatch.setattr(
+        production,
+        "generate_edition_audio",
+        fake_generate_audio,
+    )
+
+    result = production.publish_edition(
+        item,
+        log=log,
+        publisher=publisher,
+        approval_manifest_path=approval_manifest,
+        audio_publisher=fake_audio_publish,
+    )
+
+    assert result["status"] == COMPLETED
+    assert result["delivery"]["status"] == "SENT"
+    assert result["audio"]["status"] == "GENERATED"
+    assert result["audio_delivery"]["status"] == "SENT"
+
+    assert calls == [
+        "text_publish",
+        "audio_generate",
+        "audio_publish:114",
+    ]
 
     log.close()

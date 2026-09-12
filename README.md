@@ -7,7 +7,7 @@ AROUND THE MAIN is an automated international news publication system. It transf
 
 **AROUND THE MAIN is not a headline-copying aggregator.** Sources provide reporting, facts, data and context; the final product is independently selected, verified, structured and written.
 
-> **Current specification: `AROUND_THE_MAIN_TZ_v1.4.md`**
+> **Current specification: `AROUND_THE_MAIN_TZ_v1.5.md`**
 
 ---
 
@@ -22,7 +22,7 @@ AROUND THE MAIN is an automated international news publication system. It transf
 | Daily editions | 3 |
 | Schedule | 07:00 / 13:00 / 20:00 |
 | Telegram | `@aroundthemain` |
-| Telegram order | Audio → Text / Printed |
+| Telegram order | Text → Audio / Printed |
 | Architecture | ONE EDITION → MULTIPLE PRESENTATIONS |
 
 ---
@@ -114,6 +114,20 @@ Release windows:
 The primary editorial objective is to publish all new and materially relevant information that became available after the previous release. The number of stories is adaptive and is not constrained by a fixed target, minimum, or maximum.
 
 Recent information receives additional freshness priority, while older but materially important developments remain eligible.
+
+## Production Publication Order
+
+Approved editions use a strict text-first Telegram publication sequence:
+
+
+
+Audio must not be generated or published before the text publication step has succeeded or has been confirmed as already completed.
+
+Text and Audio belong to the same Edition ID and edition number.
+
+Canonical Audio Telegram caption:
+
+
 
 ## 4. Editorial Snapshot
 
@@ -697,7 +711,7 @@ The system prioritizes all new and materially relevant events in that window, wi
 
 ## 27. Canonical Files
 
-- `AROUND_THE_MAIN_TZ_v1.4.md` — current controlling technical specification;
+- `AROUND_THE_MAIN_TZ_v1.5.md` — current controlling technical specification;
 - `AROUND_THE_MAIN_TZ_v1.2.txt` — previous working specification retained for history;
 - `README.md` — project overview and operational rules.
 
