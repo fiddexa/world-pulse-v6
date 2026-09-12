@@ -271,13 +271,19 @@ def _draw_last_page_branding(
     """
     Fill the final-page free area aesthetically.
 
+    The INFO block is always the same element:
+    same text, same typography, same spacing.
+
+    Banner selection is based on the actual available vertical space.
+    Six banner sizes are tested from largest to smallest.
+
     Rules:
-    - >=55%: large banner + info
-    - 40-55%: standard banner + info
-    - 25-40%: compact banner + info
-    - <25%: info only, if the complete info block fits
-    - if complete info does not fit: nothing
+    - <25% free space: INFO only
+    - >=25%: choose the largest banner that fully fits with INFO
+    - if no banner fits: INFO only
+    - if complete INFO does not fit: nothing
     """
+
     free_height = max(
         0,
         available_bottom
@@ -297,6 +303,10 @@ def _draw_last_page_branding(
         - MARGIN * 2
     )
 
+    # -------------------------------------------------------------
+    # INFO is the absolute minimum usable block.
+    # -------------------------------------------------------------
+
     info_metrics = _last_page_info_metrics(
         draw,
         content_width,
@@ -304,7 +314,6 @@ def _draw_last_page_branding(
 
     info_height = info_metrics["height"]
 
-    # The information block is the absolute minimum.
     if free_height < info_height:
         return {
             "drawn": False,
@@ -318,173 +327,176 @@ def _draw_last_page_branding(
         / MOBILE_PAGE_HEIGHT
     )
 
-    variant = "INFO_ONLY"
-    logo_width = 0
-    banner_height = 0
+    # -------------------------------------------------------------
+    # Below 25%: never force a banner.
+    # -------------------------------------------------------------
 
-    if free_ratio >= LAST_PAGE_LARGE_THRESHOLD:
-        variant = "LARGE"
-        logo_width = 720
-        banner_height = 240
-
-    elif free_ratio >= LAST_PAGE_STANDARD_THRESHOLD:
-        variant = "STANDARD"
-        logo_width = 560
-        banner_height = 187
-
-    elif free_ratio >= LAST_PAGE_FREE_SPACE_THRESHOLD:
-        variant = "COMPACT"
-        logo_width = 420
-        banner_height = 140
-
-    # Check whether the chosen banner + info actually fit.
-    if variant != "INFO_ONLY":
-        logo_width = min(
-            logo_width,
-            content_width,
+    if free_ratio < 0.25:
+        info_top = (
+            last_content_bottom
+            + LAST_PAGE_BLOCK_GAP
         )
 
-        try:
-            with Image.open(
-                LAST_PAGE_LOGO
-            ) as source:
-                logo = source.convert("RGBA")
+        info_bottom = _draw_last_page_info(
+            canvas,
+            draw,
+            top=info_top,
+            width=content_width,
+        )
 
-            logo_height = int(
-                logo.height
-                * logo_width
-                / logo.width
-            )
+        return {
+            "drawn": info_bottom is not None,
+            "variant": "INFO_ONLY",
+            "free_height": free_height,
+            "info_height": info_height,
+            "banner": False,
+            "bottom": info_bottom,
+        }
 
-            logo_height = min(
-                logo_height,
-                banner_height,
-            )
+    # -------------------------------------------------------------
+    # Six banner sizes.
+    #
+    # The source asset is 3:1, so height is derived from width.
+    # Test largest -> smallest and use the first one that fully fits.
+    # -------------------------------------------------------------
 
-            required = (
-                logo_height
-                + LAST_PAGE_BLOCK_GAP
-                + info_height
-            )
+    banner_sizes = [
+        ("SIZE_06", 810),
+        ("SIZE_05", 720),
+        ("SIZE_04", 630),
+        ("SIZE_03", 540),
+        ("SIZE_02", 450),
+        ("SIZE_01", 360),
+    ]
 
-            if required > free_height:
-                # Try the next smaller banner.
-                if variant == "LARGE":
-                    variant = "STANDARD"
-                    logo_width = 560
-                    banner_height = 187
+    chosen = None
 
-                elif variant == "STANDARD":
-                    variant = "COMPACT"
-                    logo_width = 420
-                    banner_height = 140
+    try:
+        with Image.open(
+            LAST_PAGE_LOGO
+        ) as source:
+            logo_source = source.convert("RGBA")
 
-                elif variant == "COMPACT":
-                    variant = "INFO_ONLY"
+        source_ratio = (
+            logo_source.height
+            / logo_source.width
+        )
 
-                if variant != "INFO_ONLY":
-                    logo_width = min(
-                        logo_width,
-                        content_width,
-                    )
-
-                    logo_height = int(
-                        logo.height
-                        * logo_width
-                        / logo.width
-                    )
-
-                    logo_height = min(
-                        logo_height,
-                        banner_height,
-                    )
-
-                    required = (
-                        logo_height
-                        + LAST_PAGE_BLOCK_GAP
-                        + info_height
-                    )
-
-                    if required > free_height:
-                        variant = "INFO_ONLY"
-
-        except Exception:
-            variant = "INFO_ONLY"
-
-    cursor = (
-        last_content_bottom
-        + LAST_PAGE_BLOCK_GAP
-    )
-
-    drawn_banner = False
-
-    if variant != "INFO_ONLY":
-        try:
-            with Image.open(
-                LAST_PAGE_LOGO
-            ) as source:
-                logo = source.convert("RGBA")
-
+        for variant, logo_width in banner_sizes:
             logo_width = min(
                 logo_width,
                 content_width,
             )
 
             logo_height = int(
-                logo.height
-                * logo_width
-                / logo.width
+                logo_width
+                * source_ratio
             )
 
-            logo_height = min(
-                logo_height,
-                banner_height,
+            required_height = (
+                logo_height
+                + LAST_PAGE_BLOCK_GAP
+                + info_height
             )
 
-            logo = logo.resize(
-                (
+            if required_height <= free_height:
+                chosen = (
+                    variant,
                     logo_width,
                     logo_height,
-                ),
-                Image.Resampling.LANCZOS,
-            )
+                )
+                break
 
-            logo_x = (
-                MARGIN
-                + (
-                    content_width
-                    - logo.width
-                ) // 2
-            )
+    except Exception as exc:
+        print(
+            "[WARN] Last-page banner load failed:",
+            exc,
+        )
 
-            canvas.paste(
-                logo,
-                (
-                    logo_x,
-                    cursor,
-                ),
-                logo,
-            )
+    # -------------------------------------------------------------
+    # No banner fits: draw the same INFO block only.
+    # -------------------------------------------------------------
 
-            cursor += (
-                logo.height
-                + LAST_PAGE_BLOCK_GAP
-            )
+    if chosen is None:
+        info_top = (
+            last_content_bottom
+            + LAST_PAGE_BLOCK_GAP
+        )
 
-            drawn_banner = True
+        info_bottom = _draw_last_page_info(
+            canvas,
+            draw,
+            top=info_top,
+            width=content_width,
+        )
 
-        except Exception as exc:
-            print(
-                "[WARN] Last-page banner failed:",
-                exc,
-            )
+        return {
+            "drawn": info_bottom is not None,
+            "variant": "INFO_ONLY",
+            "free_height": free_height,
+            "info_height": info_height,
+            "banner": False,
+            "bottom": info_bottom,
+        }
 
-            variant = "INFO_ONLY"
+    variant, logo_width, logo_height = chosen
 
-            cursor = (
-                last_content_bottom
-                + LAST_PAGE_BLOCK_GAP
-            )
+    cursor = (
+        last_content_bottom
+        + LAST_PAGE_BLOCK_GAP
+    )
+
+    # -------------------------------------------------------------
+    # Draw selected banner.
+    # -------------------------------------------------------------
+
+    try:
+        logo = logo_source.resize(
+            (
+                logo_width,
+                logo_height,
+            ),
+            Image.Resampling.LANCZOS,
+        )
+
+        logo_x = (
+            MARGIN
+            + (
+                content_width
+                - logo.width
+            ) // 2
+        )
+
+        canvas.paste(
+            logo,
+            (
+                logo_x,
+                cursor,
+            ),
+            logo,
+        )
+
+        cursor += (
+            logo.height
+            + LAST_PAGE_BLOCK_GAP
+        )
+
+    except Exception as exc:
+        print(
+            "[WARN] Last-page banner render failed:",
+            exc,
+        )
+
+        variant = "INFO_ONLY"
+
+        cursor = (
+            last_content_bottom
+            + LAST_PAGE_BLOCK_GAP
+        )
+
+    # -------------------------------------------------------------
+    # Draw the SAME INFO block as in the INFO-only case.
+    # -------------------------------------------------------------
 
     info_bottom = _draw_last_page_info(
         canvas,
@@ -495,10 +507,11 @@ def _draw_last_page_branding(
 
     if info_bottom is None:
         return {
-            "drawn": drawn_banner,
-            "variant": variant,
+            "drawn": False,
+            "variant": "NONE",
             "free_height": free_height,
             "info_height": info_height,
+            "banner": False,
         }
 
     return {
@@ -506,7 +519,9 @@ def _draw_last_page_branding(
         "variant": variant,
         "free_height": free_height,
         "info_height": info_height,
-        "banner": drawn_banner,
+        "banner": True,
+        "banner_width": logo_width,
+        "banner_height": logo_height,
         "bottom": info_bottom,
     }
 
@@ -839,6 +854,40 @@ def _edition_date(edition: dict) -> str:
         if value:
             return value
 
+    # Production editions carry the publication date in edition_id:
+    # AROUND-THE-MAIN-EN-YYYY-MM-DD-HHMM
+    edition_id = _safe_text(
+        edition.get("edition_id")
+    )
+
+    match = re.search(
+        r"(\d{4})-(\d{2})-(\d{2})",
+        edition_id,
+    )
+
+    if match:
+        year, month, day = match.groups()
+
+        month_names = {
+            "01": "JAN",
+            "02": "FEB",
+            "03": "MAR",
+            "04": "APR",
+            "05": "MAY",
+            "06": "JUN",
+            "07": "JUL",
+            "08": "AUG",
+            "09": "SEP",
+            "10": "OCT",
+            "11": "NOV",
+            "12": "DEC",
+        }
+
+        month_name = month_names.get(month)
+
+        if month_name:
+            return f"{day} {month_name} {year}"
+
     return ""
 
 
@@ -1069,13 +1118,14 @@ def _card_height(
     compact: bool = True,
 ) -> int:
     """
-    Calculate the exact height of a text-only mobile story card.
+    Calculate card height from the exact typography used by the
+    final Mobile renderer.
 
-    Mobile production is currently text-first:
-    no story photographs are rendered.
+    SOURCE is part of the normal text flow:
+    summary -> SOURCE -> source name -> bottom padding.
 
-    The same geometry is used during pagination and final drawing,
-    so a card can never overflow into the next UI block.
+    The pagination geometry and the drawing geometry intentionally
+    use the same measurements.
     """
 
     if not isinstance(event, dict):
@@ -1089,18 +1139,31 @@ def _card_height(
 
     probe_draw = ImageDraw.Draw(probe)
 
+    # These values must match the actual drawing code below.
     title_font = _font(20, bold=True)
-    summary_font = _font(13)
+    summary_font = _font(18)
+    source_label_font = _font(11, bold=True)
     source_font = _font(11)
 
     title_max_lines = 2
-    summary_max_lines = 3
+    summary_max_lines = 2
+    source_max_lines = 2
 
     card_inner_width = (
         WIDTH
         - MARGIN * 2
         - 32
     )
+
+    # -------------------------------------------------------------
+    # CATEGORY BAND
+    # -------------------------------------------------------------
+
+    height = 35 + 15
+
+    # -------------------------------------------------------------
+    # HEADLINE
+    # -------------------------------------------------------------
 
     title_lines = _wrap(
         probe_draw,
@@ -1114,6 +1177,17 @@ def _card_height(
         - title_font.getbbox("Ag")[1]
         + 4
     )
+
+    if title_lines:
+        height += (
+            len(title_lines)
+            * title_line_height
+        )
+        height += 7
+
+    # -------------------------------------------------------------
+    # SUMMARY
+    # -------------------------------------------------------------
 
     summary = _summary(event)
 
@@ -1133,43 +1207,6 @@ def _card_height(
         + 4
     )
 
-    sources = _sources(event)
-
-    source_lines = []
-
-    if sources:
-        source_text = "  •  ".join(
-            sources[:3]
-        )
-
-        source_lines = _wrap(
-            probe_draw,
-            source_text,
-            source_font,
-            max(
-                1,
-                card_inner_width - 55,
-            ),
-        )[:2]
-
-    source_line_height = (
-        source_font.getbbox("Ag")[3]
-        - source_font.getbbox("Ag")[1]
-        + 2
-    )
-
-    # Header band.
-    height = 35 + 15
-
-    # Headline.
-    if title_lines:
-        height += (
-            len(title_lines)
-            * title_line_height
-        )
-        height += 7
-
-    # Summary.
     if summary_lines:
         height += (
             len(summary_lines)
@@ -1177,24 +1214,86 @@ def _card_height(
         )
         height += 7
 
-    # Source.
-    if source_lines:
-        height += max(
-            18,
-            len(source_lines)
-            * source_line_height,
+    # -------------------------------------------------------------
+    # SOURCE — directly after the final summary line
+    # -------------------------------------------------------------
+
+    sources = _sources(event)
+
+    if sources:
+        normalized_sources = []
+
+        for source in sources[:3]:
+            value = _safe_text(source)
+
+            source_aliases = {
+                "un": "UN News",
+                "un news": "UN News",
+                "united nations": "United Nations",
+                "who": "WHO",
+                "unicef": "UNICEF",
+            }
+
+            value = source_aliases.get(
+                value.lower(),
+                value,
+            )
+
+            if value and value not in normalized_sources:
+                normalized_sources.append(value)
+
+        source_text = "  •  ".join(
+            normalized_sources
         )
 
-    # Bottom padding.
-    height += 14
+        source_lines = _wrap(
+            probe_draw,
+            source_text,
+            source_font,
+            card_inner_width,
+        )[:source_max_lines]
 
-    # Keep every card readable and predictable.
+        source_label_height = (
+            source_label_font.getbbox("Ag")[3]
+            - source_label_font.getbbox("Ag")[1]
+        )
+
+        source_line_height = (
+            source_font.getbbox("Ag")[3]
+            - source_font.getbbox("Ag")[1]
+            + 2
+        )
+
+        source_gap = 4
+        source_bottom_padding = 10
+
+        # Gap before SOURCE.
+        height += 7
+
+        # SOURCE label.
+        height += source_label_height
+
+        # Gap between label and source name.
+        height += source_gap
+
+        # Source name.
+        height += (
+            max(1, len(source_lines))
+            * source_line_height
+        )
+
+        # Space before card bottom.
+        height += source_bottom_padding
+
+    else:
+        # Bottom padding when there is no SOURCE.
+        height += 14
+
+    # Do NOT use an artificially low upper limit here.
+    # The card must grow when its real text content requires it.
     return max(
         175,
-        min(
-            300,
-            height,
-        ),
+        height,
     )
 
 
@@ -2134,58 +2233,51 @@ def render_mobile_edition(
                 )
 
                 # -----------------------------------------------------
-                # SOURCE BLOCK — anchored to the bottom of the card.
+                # SOURCE — follows the final rendered summary line.
                 # -----------------------------------------------------
+
                 source_font = _font(11)
 
-                source_lines = _wrap(
-                    draw,
-                    source_text,
-                    source_font,
-                    text_width,
-                )[:2]
+                source_gap = 7
 
-                source_line_height = (
-                    source_font.getbbox("Ag")[3]
-                    - source_font.getbbox("Ag")[1]
-                    + 2
+                source_y = (
+                    current_y
+                    if not summary
+                    else current_y
                 )
 
-                source_gap = 4
-                source_bottom_padding = 10
-
-                source_text_height = (
-                    max(1, len(source_lines))
-                    * source_line_height
-                )
-
-                source_block_height = (
-                    11 + source_gap + source_text_height
-                )
-
-                sources_y = (
-                    card_bottom
-                    - source_bottom_padding
-                    - source_block_height
-                )
-
-                # SOURCE label.
                 draw.text(
                     (
                         text_x,
-                        sources_y,
+                        source_y,
                     ),
                     "SOURCE",
                     font=_font(11, bold=True),
                     fill=RED,
                 )
 
-                # Source name.
+                source_label_bbox = draw.textbbox(
+                    (0, 0),
+                    "SOURCE",
+                    font=_font(11, bold=True),
+                )
+
+                source_label_height = (
+                    source_label_bbox[3]
+                    - source_label_bbox[1]
+                )
+
+                source_name_y = (
+                    source_y
+                    + source_label_height
+                    + 4
+                )
+
                 _draw_wrapped(
                     draw,
                     source_text,
                     text_x,
-                    sources_y + 11 + source_gap,
+                    source_name_y,
                     source_font,
                     GRAY,
                     text_width,
