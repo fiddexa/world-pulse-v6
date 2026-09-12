@@ -72,7 +72,9 @@ class PiperTTSRenderer:
         model_path: str | Path | None = None,
         piper_binary: str | None = None,
         ffmpeg_binary: str | None = None,
-        sentence_silence: float = 0.35,
+        sentence_silence: float = 0.30,
+        noise_w: float = 0.0,
+        length_scale: float = 0.65,
         bitrate: str = "128k",
         timeout: int = 300,
     ) -> None:
@@ -93,6 +95,8 @@ class PiperTTSRenderer:
         )
 
         self.sentence_silence = float(sentence_silence)
+        self.noise_w = float(noise_w)
+        self.length_scale = float(length_scale)
         self.bitrate = str(bitrate)
         self.timeout = int(timeout)
 
@@ -142,6 +146,10 @@ class PiperTTSRenderer:
                     str(wav_path),
                     "--sentence-silence",
                     str(self.sentence_silence),
+                    "--noise_w",
+                    str(self.noise_w),
+                    "--length_scale",
+                    str(self.length_scale),
                 ],
                 input=script,
                 text=True,
