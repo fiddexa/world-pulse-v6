@@ -42,9 +42,17 @@ X_LOGO_PATH = Path("assets/x/logo-black.png")
 # HELPERS
 # =====================================================================
 
-def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    if bold:
+def _font(
+    size: int,
+    bold: bool = False,
+    italic: bool = False,
+) -> ImageFont.FreeTypeFont:
+    if bold and italic:
+        font_path = "/usr/share/fonts/opentype/inter/Inter-BoldItalic.otf"
+    elif bold:
         font_path = "/usr/share/fonts/opentype/inter/Inter-Bold.otf"
+    elif italic:
+        font_path = "/usr/share/fonts/opentype/inter/Inter-Italic.otf"
     else:
         font_path = "/usr/share/fonts/opentype/inter/Inter-Regular.otf"
 
@@ -54,11 +62,14 @@ def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
         return ImageFont.truetype(str(path), size)
 
     # Fallback if Inter is unavailable.
-    fallback = (
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        if bold
-        else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-    )
+    if bold and italic:
+        fallback = "/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf"
+    elif bold:
+        fallback = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    elif italic:
+        fallback = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf"
+    else:
+        fallback = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
     fallback_path = Path(fallback)
 
@@ -66,6 +77,438 @@ def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
         return ImageFont.truetype(str(fallback_path), size)
 
     return ImageFont.load_default()
+
+
+# =====================================================================
+# LAST PAGE BRANDING / INFORMATION
+# =====================================================================
+
+LAST_PAGE_LOGO = Path(
+    "assets/around_the_main_last_page_3x1.png"
+)
+
+LAST_PAGE_FREE_SPACE_THRESHOLD = 0.25
+LAST_PAGE_STANDARD_THRESHOLD = 0.40
+LAST_PAGE_LARGE_THRESHOLD = 0.55
+LAST_PAGE_BLOCK_GAP = 18
+LAST_PAGE_FOOTER_GAP = 16
+
+INFO_RIGHTS_POLICY = (
+    "We gather information from publicly available and reputable news "
+    "sources, then independently edit and summarize it for clarity, "
+    "context and informational purposes. We respect intellectual "
+    "property rights and do not claim ownership of third-party materials."
+)
+
+INFO_RIGHTS_POLICY_2 = (
+    "Trademarks, logos, photographs and other protected materials remain "
+    "the property of their respective owners and are used with attribution "
+    "where applicable. No affiliation, endorsement or transfer of rights "
+    "is implied."
+)
+
+PUBLICATION_NOTICE = (
+    "AROUND THE MAIN is an independent editorial project. Content is "
+    "provided for informational purposes and does not constitute "
+    "professional, financial, legal or other advice."
+)
+
+
+def _last_page_info_metrics(draw, width: int) -> dict:
+    """
+    Measure the complete information block.
+
+    The same text, font and spacing are used whether or not
+    the last-page banner is present.
+    """
+    font = _font(11, italic=True)
+    heading_font = _font(11, italic=True)
+
+    heading = "INFORMATION & RIGHTS"
+
+    heading_bbox = draw.textbbox(
+        (0, 0),
+        heading,
+        font=heading_font,
+    )
+
+    heading_height = (
+        heading_bbox[3] - heading_bbox[1]
+    )
+
+    paragraphs = [
+        INFO_RIGHTS_POLICY,
+        INFO_RIGHTS_POLICY_2,
+        PUBLICATION_NOTICE,
+    ]
+
+    paragraph_lines = []
+
+    for paragraph in paragraphs:
+        lines = _wrap(
+            draw,
+            paragraph,
+            font,
+            width,
+        )
+
+        paragraph_lines.append(
+            max(1, len(lines))
+        )
+
+    line_height = (
+        font.getbbox("Ag")[3]
+        - font.getbbox("Ag")[1]
+    )
+
+    # Compact italic block.
+    heading_gap = 5
+    paragraph_gap = 4
+    top_padding = 7
+    bottom_padding = 7
+
+    text_height = sum(
+        count * line_height
+        + (count - 1)
+        for count in paragraph_lines
+    )
+
+    gaps = (
+        heading_gap
+        + paragraph_gap * (len(paragraphs) - 1)
+    )
+
+    total_height = (
+        top_padding
+        + heading_height
+        + gaps
+        + text_height
+        + bottom_padding
+    )
+
+    return {
+        "height": total_height,
+        "font": font,
+        "heading_font": heading_font,
+        "line_height": line_height,
+        "heading": heading,
+        "paragraphs": paragraphs,
+        "heading_gap": heading_gap,
+        "paragraph_gap": paragraph_gap,
+        "top_padding": top_padding,
+        "bottom_padding": bottom_padding,
+    }
+
+
+def _draw_last_page_info(
+    canvas,
+    draw,
+    *,
+    top: int,
+    width: int,
+) -> int | None:
+    """
+    Draw the complete information block without truncation.
+
+    Returns the bottom coordinate when successful.
+    """
+    metrics = _last_page_info_metrics(
+        draw,
+        width,
+    )
+
+    cursor = top + metrics["top_padding"]
+
+    draw.text(
+        (MARGIN, cursor),
+        metrics["heading"],
+        font=metrics["heading_font"],
+        fill=RED,
+    )
+
+    heading_bbox = draw.textbbox(
+        (0, 0),
+        metrics["heading"],
+        font=metrics["heading_font"],
+    )
+
+    cursor += (
+        heading_bbox[3]
+        - heading_bbox[1]
+        + metrics["heading_gap"]
+    )
+
+    for index, paragraph in enumerate(
+        metrics["paragraphs"]
+    ):
+        cursor = _draw_wrapped(
+            draw,
+            paragraph,
+            MARGIN,
+            cursor,
+            metrics["font"],
+            GRAY if index < 2 else BLACK,
+            width,
+            max_lines=20,
+            spacing=1,
+        )
+
+        if index < len(metrics["paragraphs"]) - 1:
+            cursor += metrics["paragraph_gap"]
+
+    cursor += metrics["bottom_padding"]
+
+    return cursor
+
+
+def _draw_last_page_branding(
+    canvas,
+    draw,
+    *,
+    last_content_bottom: int,
+    available_bottom: int,
+) -> dict:
+    """
+    Fill the final-page free area aesthetically.
+
+    Rules:
+    - >=55%: large banner + info
+    - 40-55%: standard banner + info
+    - 25-40%: compact banner + info
+    - <25%: info only, if the complete info block fits
+    - if complete info does not fit: nothing
+    """
+    free_height = max(
+        0,
+        available_bottom
+        - last_content_bottom
+        - LAST_PAGE_BLOCK_GAP,
+    )
+
+    if free_height <= 0:
+        return {
+            "drawn": False,
+            "variant": "NONE",
+            "free_height": free_height,
+        }
+
+    content_width = (
+        WIDTH
+        - MARGIN * 2
+    )
+
+    info_metrics = _last_page_info_metrics(
+        draw,
+        content_width,
+    )
+
+    info_height = info_metrics["height"]
+
+    # The information block is the absolute minimum.
+    if free_height < info_height:
+        return {
+            "drawn": False,
+            "variant": "NONE",
+            "free_height": free_height,
+            "info_height": info_height,
+        }
+
+    free_ratio = (
+        free_height
+        / MOBILE_PAGE_HEIGHT
+    )
+
+    variant = "INFO_ONLY"
+    logo_width = 0
+    banner_height = 0
+
+    if free_ratio >= LAST_PAGE_LARGE_THRESHOLD:
+        variant = "LARGE"
+        logo_width = 720
+        banner_height = 240
+
+    elif free_ratio >= LAST_PAGE_STANDARD_THRESHOLD:
+        variant = "STANDARD"
+        logo_width = 560
+        banner_height = 187
+
+    elif free_ratio >= LAST_PAGE_FREE_SPACE_THRESHOLD:
+        variant = "COMPACT"
+        logo_width = 420
+        banner_height = 140
+
+    # Check whether the chosen banner + info actually fit.
+    if variant != "INFO_ONLY":
+        logo_width = min(
+            logo_width,
+            content_width,
+        )
+
+        try:
+            with Image.open(
+                LAST_PAGE_LOGO
+            ) as source:
+                logo = source.convert("RGBA")
+
+            logo_height = int(
+                logo.height
+                * logo_width
+                / logo.width
+            )
+
+            logo_height = min(
+                logo_height,
+                banner_height,
+            )
+
+            required = (
+                logo_height
+                + LAST_PAGE_BLOCK_GAP
+                + info_height
+            )
+
+            if required > free_height:
+                # Try the next smaller banner.
+                if variant == "LARGE":
+                    variant = "STANDARD"
+                    logo_width = 560
+                    banner_height = 187
+
+                elif variant == "STANDARD":
+                    variant = "COMPACT"
+                    logo_width = 420
+                    banner_height = 140
+
+                elif variant == "COMPACT":
+                    variant = "INFO_ONLY"
+
+                if variant != "INFO_ONLY":
+                    logo_width = min(
+                        logo_width,
+                        content_width,
+                    )
+
+                    logo_height = int(
+                        logo.height
+                        * logo_width
+                        / logo.width
+                    )
+
+                    logo_height = min(
+                        logo_height,
+                        banner_height,
+                    )
+
+                    required = (
+                        logo_height
+                        + LAST_PAGE_BLOCK_GAP
+                        + info_height
+                    )
+
+                    if required > free_height:
+                        variant = "INFO_ONLY"
+
+        except Exception:
+            variant = "INFO_ONLY"
+
+    cursor = (
+        last_content_bottom
+        + LAST_PAGE_BLOCK_GAP
+    )
+
+    drawn_banner = False
+
+    if variant != "INFO_ONLY":
+        try:
+            with Image.open(
+                LAST_PAGE_LOGO
+            ) as source:
+                logo = source.convert("RGBA")
+
+            logo_width = min(
+                logo_width,
+                content_width,
+            )
+
+            logo_height = int(
+                logo.height
+                * logo_width
+                / logo.width
+            )
+
+            logo_height = min(
+                logo_height,
+                banner_height,
+            )
+
+            logo = logo.resize(
+                (
+                    logo_width,
+                    logo_height,
+                ),
+                Image.Resampling.LANCZOS,
+            )
+
+            logo_x = (
+                MARGIN
+                + (
+                    content_width
+                    - logo.width
+                ) // 2
+            )
+
+            canvas.paste(
+                logo,
+                (
+                    logo_x,
+                    cursor,
+                ),
+                logo,
+            )
+
+            cursor += (
+                logo.height
+                + LAST_PAGE_BLOCK_GAP
+            )
+
+            drawn_banner = True
+
+        except Exception as exc:
+            print(
+                "[WARN] Last-page banner failed:",
+                exc,
+            )
+
+            variant = "INFO_ONLY"
+
+            cursor = (
+                last_content_bottom
+                + LAST_PAGE_BLOCK_GAP
+            )
+
+    info_bottom = _draw_last_page_info(
+        canvas,
+        draw,
+        top=cursor,
+        width=content_width,
+    )
+
+    if info_bottom is None:
+        return {
+            "drawn": drawn_banner,
+            "variant": variant,
+            "free_height": free_height,
+            "info_height": info_height,
+        }
+
+    return {
+        "drawn": True,
+        "variant": variant,
+        "free_height": free_height,
+        "info_height": info_height,
+        "banner": drawn_banner,
+        "bottom": info_bottom,
+    }
 
 
 def _list(value: Any) -> list:
@@ -410,43 +853,75 @@ def _format_date(value: str) -> str:
 
 
 def _collect_events(edition: dict) -> list[dict]:
-    result = []
+    """
+    Return the canonical event sequence for Mobile rendering.
 
-    seen = set()
+    For production editions, mobile_audio["events"] is the authoritative
+    ordered event list. The grouped top/main/brief fields are presentation
+    subsets of that same list and must not be concatenated again.
 
+    The legacy fallback preserves compatibility with older/minimal edition
+    structures that do not provide mobile_audio["events"].
+    """
     mobile_audio = edition.get("mobile_audio")
 
     if isinstance(mobile_audio, dict):
-        top = mobile_audio.get("top_story")
+        events = mobile_audio.get("events")
 
-        if isinstance(top, dict):
-            result.append(top)
-            seen.add(id(top))
+        if isinstance(events, list):
+            return [
+                event
+                for event in events
+                if isinstance(event, dict)
+            ]
+
+        result = []
+        seen = set()
+
+        def add_event(event):
+            if not isinstance(event, dict):
+                return
+
+            key = id(event)
+
+            if key in seen:
+                return
+
+            result.append(event)
+            seen.add(key)
+
+        top = mobile_audio.get("top_story")
+        add_event(top)
 
         for key in (
             "main_stories",
             "briefs",
-            "events",
         ):
-            for event in _list(
-                mobile_audio.get(key)
-            ):
-                if not isinstance(event, dict):
-                    continue
+            value = mobile_audio.get(key)
 
-                if id(event) in seen:
-                    continue
-
-                result.append(event)
-                seen.add(id(event))
+            if isinstance(value, list):
+                for event in value:
+                    add_event(event)
 
         return result
 
-    top = edition.get("top_story")
+    result = []
+    seen = set()
 
-    if isinstance(top, dict):
-        result.append(top)
-        seen.add(id(top))
+    def add_event(event):
+        if not isinstance(event, dict):
+            return
+
+        key = id(event)
+
+        if key in seen:
+            return
+
+        result.append(event)
+        seen.add(key)
+
+    top = edition.get("top_story")
+    add_event(top)
 
     for key in (
         "main_stories",
@@ -455,17 +930,11 @@ def _collect_events(edition: dict) -> list[dict]:
         "remaining_events",
         "overflow_events",
     ):
-        for event in _list(
-            edition.get(key)
-        ):
-            if not isinstance(event, dict):
-                continue
+        value = edition.get(key)
 
-            if id(event) in seen:
-                continue
-
-            result.append(event)
-            seen.add(id(event))
+        if isinstance(value, list):
+            for event in value:
+                add_event(event)
 
     return result
 
@@ -1766,10 +2235,56 @@ def render_mobile_edition(
 
         else:
 
-            draw_footer(
+            footer_top = draw_footer(
                 canvas,
                 draw,
                 page_number,
+            )
+
+        # -------------------------------------------------------------
+        # LAST PAGE BRANDING
+        # -------------------------------------------------------------
+
+        if page_number == len(pages):
+            if page:
+                last_content_bottom = (
+                    y - CARD_GAP
+                )
+            else:
+                last_content_bottom = (
+                    content_top_first
+                    if page_number == 1
+                    else content_top_other
+                )
+
+            if page_number == 1:
+                # MARKETS TODAY occupies the lower part of PAGE 01.
+                available_bottom = (
+                    min(
+                        footer_top - LAST_PAGE_FOOTER_GAP,
+                        markets_y - 24,
+                    )
+                )
+            else:
+                available_bottom = (
+                    footer_top - LAST_PAGE_FOOTER_GAP
+                )
+
+            branding_result = _draw_last_page_branding(
+                canvas,
+                draw,
+                last_content_bottom=last_content_bottom,
+                available_bottom=available_bottom,
+            )
+
+            print(
+                "DEBUG LAST PAGE BRANDING:",
+                f"page={page_number}",
+                f"free_height={branding_result.get('free_height')}",
+                f"info_height={branding_result.get('info_height')}",
+                f"variant={branding_result.get('variant')}",
+                f"banner={branding_result.get('banner', False)}",
+                f"drawn={branding_result.get('drawn', False)}",
             )
 
         # -------------------------------------------------------------
