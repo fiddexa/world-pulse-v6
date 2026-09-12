@@ -869,8 +869,9 @@ The project is currently being finalized on branch `approval-gate`.
 
 AROUND THE MAIN uses release-to-release editorial comparison:
 
-`07:00 ← 20:00 previous release`  
-`13:00 ← 07:00 same day`  
+`07:00 ← 20:00 previous release`
+
+`13:00 ← 07:00 same day`
 `20:00 ← 13:00 same day`
 
 The release window is a priority boundary rather than a hard cutoff.
