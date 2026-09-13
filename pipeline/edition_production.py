@@ -2,23 +2,26 @@
 AROUND THE MAIN v6 - Edition Production Orchestrator
 
 Connects an already-built production edition to the
-edition-level publication and Telegram delivery layers.
+edition-level newspaper image and audio delivery layers.
 
-This module does not collect news and does not schedule runs.
-
-It is intentionally separate from the existing event-level
-delivery system and from the production scheduler.
+The text publication package is still built and retained for
+other social channels and downstream integrations, but production
+Telegram delivery uses rendered newspaper PNG pages, not text.
 """
 
+from pathlib import Path
 from typing import Any
+import re
 
 from pipeline.edition_approval import (
     APPROVAL_APPROVED,
     get_edition_approval_status,
 )
 from pipeline.edition_publication import build_edition_publication
-from pipeline.edition_telegram_runner import (
-    publish_edition_to_telegram,
+from pipeline.edition_rendering import render_edition
+from pipeline.telegram_newspaper_runner import (
+    newspaper_delivery_already_sent,
+    publish_edition_newspaper_to_telegram,
 )
 from pipeline.telegram_audio_runner import (
     audio_delivery_already_sent,
@@ -31,6 +34,7 @@ from pipeline.edition_audio import generate_edition_audio
 
 COMPLETED = "COMPLETED"
 FAILED = "FAILED"
+
 
 def build_edition_audio(
     edition: dict,
@@ -93,6 +97,79 @@ def build_edition_audio(
         }
 
 
+def build_edition_newspaper(
+    edition: dict,
+    *,
+    output_root="data/newspaper",
+) -> dict:
+    """Render one approved edition into its complete newspaper pages."""
+
+    if not isinstance(edition, dict):
+        return {
+            "status": FAILED,
+            "reason": "INVALID_EDITION",
+        }
+
+    edition_id = str(
+        edition.get("edition_id") or ""
+    ).strip()
+
+    if not edition_id:
+        return {
+            "status": FAILED,
+            "reason": "MISSING_EDITION_ID",
+        }
+
+    safe_id = re.sub(
+        r"[^A-Za-z0-9._-]+",
+        "_",
+        edition_id,
+    ).strip("._") or "edition"
+
+    root = Path(output_root) / safe_id
+
+    try:
+        rendered = render_edition(
+            edition,
+            root,
+        )
+
+        full = rendered.get("full_edition")
+        if not isinstance(full, dict):
+            return {
+                "status": FAILED,
+                "edition_id": edition_id,
+                "reason": "NEWSPAPER_RENDER_FAILED",
+            }
+
+        files = [
+            str(path)
+            for path in (full.get("files") or [])
+            if Path(path).is_file()
+        ]
+
+        if not files:
+            return {
+                "status": FAILED,
+                "edition_id": edition_id,
+                "reason": "NO_NEWSPAPER_PAGES",
+            }
+
+        return {
+            "status": "GENERATED",
+            "edition_id": edition_id,
+            "page_count": len(files),
+            "files": files,
+            "output_root": str(root),
+        }
+
+    except Exception as exc:
+        return {
+            "status": FAILED,
+            "edition_id": edition_id,
+            "reason": "NEWSPAPER_RENDER_FAILED",
+            "error": str(exc),
+        }
 
 
 def publish_edition(
@@ -100,7 +177,9 @@ def publish_edition(
     *,
     log=None,
     publisher=None,
+    newspaper_publisher=None,
     approval_manifest_path=None,
+    newspaper_output_root="data/newspaper",
     audio_renderer=None,
     audio_output_dir="data/audio",
     audio_publisher=None,
@@ -108,9 +187,16 @@ def publish_edition(
     """
     Build and publish one AROUND THE MAIN edition.
 
-    Returns both the publication package and delivery result.
+    Production order:
+        1. build the reusable text publication package
+        2. render newspaper PNG pages
+        3. publish newspaper pages to Telegram
+        4. generate Audio only after newspaper delivery is confirmed
+        5. publish Audio to Telegram
 
-    The original edition is never modified.
+    The reusable text publication package is intentionally retained and
+    remains available to other social channels. It is not sent to Telegram
+    by this production path.
     """
     if not isinstance(edition, dict):
         return {
@@ -142,35 +228,80 @@ def publish_edition(
             "reason": "INVALID_PUBLICATION",
         }
 
-    # Text publication always happens first.
-    delivery = publish_edition_to_telegram(
-        publication,
-        log=log,
-        publisher=publisher,
-        approval_manifest_path=approval_manifest_path,
-    )
+    # Keep the complete text publication package for other social channels.
+    # This production path deliberately does not send publication["telegram"].
+    newspaper_delivery_identity = {
+        "edition_id": publication.get("edition_id")
+    }
 
-    # Audio is generated only after the text edition has been successfully
-    # published (or was already published and therefore skipped by the
-    # edition-level idempotency layer).
-    if delivery.get("status") not in {"SENT", "SKIPPED"}:
-        return {
-            "status": delivery.get("status", FAILED),
+    if newspaper_delivery_already_sent(
+        publication.get("edition_id"),
+        log=log,
+    ):
+        newspaper_result = {
+            "status": "SKIPPED",
             "edition_id": publication.get("edition_id"),
-            "publication": publication,
-            "audio": {
-                "status": "SKIPPED",
-                "edition_id": publication.get("edition_id"),
-                "reason": "TEXT_PUBLICATION_NOT_CONFIRMED",
-            },
-            "delivery": delivery,
+            "reason": "ALREADY_SENT",
         }
 
+        newspaper_delivery = {
+            "status": "SKIPPED",
+            "edition_id": publication.get("edition_id"),
+            "reason": "ALREADY_SENT",
+        }
+
+    else:
+        newspaper_result = build_edition_newspaper(
+            edition,
+            output_root=newspaper_output_root,
+        )
+
+        if newspaper_result.get("status") != "GENERATED":
+            return {
+                "status": FAILED,
+                "reason": "NEWSPAPER_RENDER_FAILED",
+                "edition_id": publication.get("edition_id"),
+                "publication": publication,
+                "newspaper": newspaper_result,
+                "newspaper_delivery": None,
+            }
+
+        newspaper_sender = (
+            newspaper_publisher
+            if newspaper_publisher is not None
+            else publish_edition_newspaper_to_telegram
+        )
+
+        newspaper_delivery = newspaper_sender(
+            publication.get("edition_id"),
+            newspaper_result.get("files", []),
+            edition_number=edition.get("edition_number"),
+            approval_manifest_path=approval_manifest_path,
+            log=log,
+        )
+
+        if newspaper_delivery.get("status") not in {
+            "SENT",
+            "SKIPPED",
+        }:
+            return {
+                "status": newspaper_delivery.get("status", FAILED),
+                "edition_id": publication.get("edition_id"),
+                "publication": publication,
+                "newspaper": newspaper_result,
+                "newspaper_delivery": newspaper_delivery,
+                "audio": {
+                    "status": "SKIPPED",
+                    "edition_id": publication.get("edition_id"),
+                    "reason": "NEWSPAPER_PUBLICATION_NOT_CONFIRMED",
+                },
+                "audio_delivery": None,
+            }
+
+    # Audio is generated only after the newspaper edition is confirmed.
     if edition.get("edition_number") is not None:
 
         # Never regenerate Audio that has already been delivered.
-        # This makes the production runner restart-safe at the
-        # generation stage, not only at the Telegram send stage.
         if audio_delivery_already_sent(
             publication.get("edition_id"),
             log=log,
@@ -191,9 +322,10 @@ def publish_edition(
                 "status": COMPLETED,
                 "edition_id": publication.get("edition_id"),
                 "publication": publication,
+                "newspaper": newspaper_result,
+                "newspaper_delivery": newspaper_delivery,
                 "audio": audio_result,
                 "audio_delivery": audio_delivery,
-                "delivery": delivery,
             }
 
         audio_result = generate_edition_audio(
@@ -208,9 +340,10 @@ def publish_edition(
                 "reason": "AUDIO_GENERATION_FAILED",
                 "edition_id": publication.get("edition_id"),
                 "publication": publication,
+                "newspaper": newspaper_result,
+                "newspaper_delivery": newspaper_delivery,
                 "audio": audio_result,
                 "audio_delivery": None,
-                "delivery": delivery,
             }
 
         audio_sender = (
@@ -224,6 +357,7 @@ def publish_edition(
             audio_result.get("audio_path"),
             edition_number=edition.get("edition_number"),
             approval_manifest_path=approval_manifest_path,
+            log=log,
         )
 
         return {
@@ -234,9 +368,10 @@ def publish_edition(
             ),
             "edition_id": publication.get("edition_id"),
             "publication": publication,
+            "newspaper": newspaper_result,
+            "newspaper_delivery": newspaper_delivery,
             "audio": audio_result,
             "audio_delivery": audio_delivery,
-            "delivery": delivery,
         }
 
     audio_result = {
@@ -248,12 +383,13 @@ def publish_edition(
     return {
         "status": (
             COMPLETED
-            if delivery.get("status") == "SENT"
-            else delivery.get("status", FAILED)
+            if newspaper_delivery.get("status") in {"SENT", "SKIPPED"}
+            else newspaper_delivery.get("status", FAILED)
         ),
         "edition_id": publication.get("edition_id"),
         "publication": publication,
+        "newspaper": newspaper_result,
+        "newspaper_delivery": newspaper_delivery,
         "audio": audio_result,
         "audio_delivery": None,
-        "delivery": delivery,
     }
