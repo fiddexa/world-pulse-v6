@@ -481,6 +481,39 @@ Established visual language:
 
 ---
 
+
+### Audio Delivery Idempotency
+
+Audio delivery is persistent and restart-safe.
+
+The Audio delivery state is stored separately from text delivery
+using the telegram_audio channel.
+
+First successful publication:
+
+TEXT = SENT
+   ↓
+AUDIO = GENERATED
+   ↓
+AUDIO = SENT
+   ↓
+AUDIO DELIVERY STATE RECORDED
+
+Repeated or restarted run:
+
+TEXT = SKIPPED
+   ↓
+AUDIO = ALREADY SENT
+   ↓
+SKIP AUDIO GENERATION
+   ↓
+SKIP AUDIO DELIVERY
+
+A successful Audio delivery is never sent twice for the same Edition ID.
+
+A failed Audio delivery remains retryable until a successful SENT state
+is recorded.
+
 ## 17. Audio Edition
 
 Audio is a presentation of the same edition, not a separate editorial selection.

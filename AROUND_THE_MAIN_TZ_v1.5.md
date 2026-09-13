@@ -69,6 +69,41 @@ AROUND THE MAIN — EDITION 0114
 Audio Edition
 
 
+
+### Audio Delivery Idempotency
+
+Audio delivery uses persistent edition-level delivery state.
+
+The Audio delivery channel is tracked separately as:
+
+telegram_audio
+
+For a first successful publication:
+
+TEXT = SENT
+   ↓
+AUDIO = GENERATED
+   ↓
+AUDIO = SENT
+   ↓
+AUDIO DELIVERY STATE RECORDED
+
+For a repeated or restarted production run:
+
+TEXT = SKIPPED
+   ↓
+AUDIO = ALREADY SENT
+   ↓
+SKIP AUDIO GENERATION
+   ↓
+SKIP AUDIO DELIVERY
+
+The protection is based on the Edition ID. The same edition cannot
+produce a second successful Audio delivery after restart.
+
+A failed Audio delivery remains retryable until a successful SENT
+state is recorded.
+
 ---
 
 ## 2. ARCHITECTURE
@@ -1291,5 +1326,6 @@ Canonical Audio Telegram caption:
 AROUND THE MAIN — EDITION 0114
 Audio Edition
 
-Audio delivery idempotency remains a separate production-hardening
-requirement and must be verified before autonomous production launch.
+Audio delivery idempotency is implemented as persistent,
+edition-level, restart-safe delivery state and is covered by automated
+tests before autonomous production launch.

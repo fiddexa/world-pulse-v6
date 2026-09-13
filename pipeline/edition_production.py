@@ -21,6 +21,7 @@ from pipeline.edition_telegram_runner import (
     publish_edition_to_telegram,
 )
 from pipeline.telegram_audio_runner import (
+    audio_delivery_already_sent,
     publish_edition_audio_to_telegram,
 )
 from pipeline.audio_script import build_audio_script
@@ -166,6 +167,35 @@ def publish_edition(
         }
 
     if edition.get("edition_number") is not None:
+
+        # Never regenerate Audio that has already been delivered.
+        # This makes the production runner restart-safe at the
+        # generation stage, not only at the Telegram send stage.
+        if audio_delivery_already_sent(
+            publication.get("edition_id"),
+            log=log,
+        ):
+            audio_result = {
+                "status": "SKIPPED",
+                "edition_id": publication.get("edition_id"),
+                "reason": "ALREADY_SENT",
+            }
+
+            audio_delivery = {
+                "status": "SKIPPED",
+                "edition_id": publication.get("edition_id"),
+                "reason": "ALREADY_SENT",
+            }
+
+            return {
+                "status": COMPLETED,
+                "edition_id": publication.get("edition_id"),
+                "publication": publication,
+                "audio": audio_result,
+                "audio_delivery": audio_delivery,
+                "delivery": delivery,
+            }
+
         audio_result = generate_edition_audio(
             edition,
             output_dir=audio_output_dir,

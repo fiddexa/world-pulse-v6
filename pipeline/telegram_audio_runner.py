@@ -15,6 +15,46 @@ from pipeline.edition_approval import (
     APPROVAL_APPROVED,
     get_edition_approval_status,
 )
+from pipeline.edition_delivery_log import (
+    TELEGRAM_AUDIO,
+    SQLiteEditionDeliveryLog,
+)
+
+
+DEFAULT_AUDIO_DELIVERY_LOG_PATH = (
+    "data/edition_delivery.sqlite3"
+)
+
+
+def _get_default_audio_log():
+    return SQLiteEditionDeliveryLog(
+        DEFAULT_AUDIO_DELIVERY_LOG_PATH
+    )
+
+
+def _audio_identity(edition_id: str) -> dict:
+    return {
+        "edition_id": str(edition_id or "").strip()
+    }
+
+
+def audio_delivery_already_sent(
+    edition_id: str,
+    *,
+    log=None,
+) -> bool:
+    edition_id = str(edition_id or "").strip()
+
+    if not edition_id:
+        return False
+
+    if log is None:
+        log = _get_default_audio_log()
+
+    return log.has_been_sent(
+        _audio_identity(edition_id),
+        TELEGRAM_AUDIO,
+    )
 
 
 def _telegram_send_audio(
@@ -132,6 +172,7 @@ def publish_edition_audio_to_telegram(
     caption=None,
     title=None,
     performer="AROUND THE MAIN",
+    log=None,
 ):
     """Publish one approved edition audio file through an injected transport."""
 
@@ -162,6 +203,19 @@ def publish_edition_audio_to_telegram(
             "status": "FAILED",
             "edition_id": edition_id,
             "reason": "AUDIO_FILE_NOT_FOUND",
+        }
+
+    if log is None:
+        log = _get_default_audio_log()
+
+    if log.has_been_sent(
+        _audio_identity(edition_id),
+        TELEGRAM_AUDIO,
+    ):
+        return {
+            "status": "SKIPPED",
+            "edition_id": edition_id,
+            "reason": "ALREADY_SENT",
         }
 
     if transport is None:
@@ -217,6 +271,11 @@ def publish_edition_audio_to_telegram(
     )
 
     if isinstance(response, dict) and response.get("ok") is True:
+        log.record_sent(
+            _audio_identity(edition_id),
+            TELEGRAM_AUDIO,
+        )
+
         return {
             "status": "SENT",
             "edition_id": edition_id,
@@ -226,6 +285,11 @@ def publish_edition_audio_to_telegram(
                 else None
             ),
         }
+
+    log.record_failed(
+        _audio_identity(edition_id),
+        TELEGRAM_AUDIO,
+    )
 
     return {
         "status": "FAILED",

@@ -7,6 +7,7 @@ from pipeline.edition_production import (
 )
 from pipeline.edition_delivery_log import (
     TELEGRAM,
+    TELEGRAM_AUDIO,
     SQLiteEditionDeliveryLog,
 )
 
@@ -280,5 +281,57 @@ def test_publish_edition_text_before_audio(tmp_path, monkeypatch):
         "audio_generate",
         "audio_publish:114",
     ]
+
+    log.close()
+
+def test_publish_edition_does_not_regenerate_already_sent_audio(
+    tmp_path,
+    monkeypatch,
+):
+    from tests.conftest import create_approved_manifest
+    import pipeline.edition_production as production
+
+    item = edition()
+    item["edition_number"] = 115
+
+    log = SQLiteEditionDeliveryLog(":memory:")
+
+    approval_manifest = create_approved_manifest(
+        tmp_path,
+        item["edition_id"],
+    )
+
+    # Simulate Audio having already been successfully delivered.
+    log.record_sent(
+        {"edition_id": item["edition_id"]},
+        TELEGRAM_AUDIO,
+    )
+
+    def unexpected_audio_generation(*args, **kwargs):
+        raise AssertionError(
+            "Audio generation must not run when Audio is already SENT"
+        )
+
+    monkeypatch.setattr(
+        production,
+        "generate_edition_audio",
+        unexpected_audio_generation,
+    )
+
+    publisher = MockPublisher()
+
+    result = production.publish_edition(
+        item,
+        log=log,
+        publisher=publisher,
+        approval_manifest_path=approval_manifest,
+    )
+
+    assert result["status"] == COMPLETED
+    assert result["delivery"]["status"] == "SENT"
+    assert result["audio"]["status"] == "SKIPPED"
+    assert result["audio"]["reason"] == "ALREADY_SENT"
+    assert result["audio_delivery"]["status"] == "SKIPPED"
+    assert result["audio_delivery"]["reason"] == "ALREADY_SENT"
 
     log.close()
