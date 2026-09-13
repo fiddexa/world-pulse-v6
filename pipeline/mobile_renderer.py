@@ -24,7 +24,7 @@ BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 GRAY = (50, 50, 50)
 LIGHT_GRAY = (200, 200, 200)
-NEWSPAPER = (243, 233, 216)
+NEWSPAPER = (252, 237, 218)
 
 WIDTH = 900
 MARGIN = 36
@@ -1463,9 +1463,11 @@ def render_mobile_edition(
                         (0, 0),
                     )
 
-                    # MORNING BRIEFING — placed in the open space
-                    # between the interrupted top lines of the header.
-                    briefing = "MORNING BRIEFING"
+                    # Edition-specific briefing label.
+                    # 07:00 -> MORNING BRIEFING
+                    # 13:00 -> MIDDAY UPDATE
+                    # 20:00 -> EVENING ROUND-UP
+                    briefing = _edition_name(edition)
 
                     briefing_bbox = draw.textbbox(
                         (0, 0),
@@ -1806,6 +1808,99 @@ def render_mobile_edition(
             print(f"[WARN] Failed to draw footer: {exc}")
 
             
+    def _draw_stretched_value(
+        canvas: Image.Image,
+        text: str,
+        x: int,
+        y: int,
+        *,
+        scale_x: float = 1.06,
+        max_right: int | None = None,
+    ) -> None:
+        """
+        Draw only the market VALUE text with horizontal stretching.
+
+        Labels such as INDEXES / COMMODITIES remain unchanged.
+        """
+
+        font = _font(11)
+
+        probe = Image.new(
+            "RGBA",
+            (1600, 80),
+            (0, 0, 0, 0),
+        )
+        probe_draw = ImageDraw.Draw(probe)
+
+        bbox = probe_draw.textbbox(
+            (0, 0),
+            text,
+            font=font,
+        )
+
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+
+        if text_width <= 0 or text_height <= 0:
+            return
+
+        effective_scale = scale_x
+
+        if max_right is not None:
+            available = max_right - x
+
+            if available <= 0:
+                return
+
+            effective_scale = min(
+                effective_scale,
+                available / text_width,
+            )
+
+        layer = Image.new(
+            "RGBA",
+            (
+                text_width + 8,
+                text_height + 8,
+            ),
+            (0, 0, 0, 0),
+        )
+
+        layer_draw = ImageDraw.Draw(layer)
+
+        layer_draw.text(
+            (
+                4 - bbox[0],
+                4 - bbox[1],
+            ),
+            text,
+            font=font,
+            fill=GRAY,
+        )
+
+        new_width = max(
+            layer.width + 1,
+            int(layer.width * effective_scale),
+        )
+
+        layer = layer.resize(
+            (
+                new_width,
+                layer.height,
+            ),
+            Image.Resampling.LANCZOS,
+        )
+
+        canvas.paste(
+            layer,
+            (
+                x,
+                y,
+            ),
+            layer,
+        )
+
+
     def draw_markets_today(
         canvas: Image.Image,
         draw: ImageDraw.ImageDraw,
@@ -1848,11 +1943,13 @@ def render_mobile_edition(
 
         data_x = label_bbox[2] + 10
 
-        draw.text(
-            (data_x, row1_y),
+        _draw_stretched_value(
+            canvas,
             "S&P 500  7,747.71  +1.06%   |   NASDAQ  26,584.06  +1.40%   |   DOW  53,686.11  +1.18%",
-            font=_font(11),
-            fill=GRAY,
+            data_x,
+            row1_y - 4,
+            scale_x=1.06,
+            max_right=WIDTH - MARGIN,
         )
 
         # -------------------------------------------------------------
@@ -1877,11 +1974,13 @@ def render_mobile_edition(
 
         data_x = label_bbox[2] + 10
 
-        draw.text(
-            (data_x, row2_y),
+        _draw_stretched_value(
+            canvas,
             "BRENT  $95.69  +0.46%   |   GOLD  $4,520.40  +0.96%   |   WTI  $91.71  +1.01%",
-            font=_font(11),
-            fill=GRAY,
+            data_x,
+            row2_y - 4,
+            scale_x=1.06,
+            max_right=WIDTH - MARGIN,
         )
 
         # -------------------------------------------------------------
@@ -1906,11 +2005,13 @@ def render_mobile_edition(
 
         data_x = label_bbox[2] + 10
 
-        draw.text(
-            (data_x, row3_y),
+        _draw_stretched_value(
+            canvas,
             "EUR/USD  1.1627   |   DXY  99.12  +0.27%   |   USD/CNY  6.7113  -0.11%",
-            font=_font(11),
-            fill=GRAY,
+            data_x,
+            row3_y - 4,
+            scale_x=1.06,
+            max_right=WIDTH - MARGIN,
         )
 
         # -------------------------------------------------------------
@@ -1935,11 +2036,13 @@ def render_mobile_edition(
 
         data_x = label_bbox[2] + 10
 
-        draw.text(
-            (data_x, row4_y),
+        _draw_stretched_value(
+            canvas,
             "NVIDIA  +1.80%   |   APPLE  +1.00%   |   TESLA  +5.42%",
-            font=_font(11),
-            fill=GRAY,
+            data_x,
+            row4_y - 4,
+            scale_x=1.06,
+                max_right=WIDTH - MARGIN,
         )
 
     for page_number, page_events in enumerate(
