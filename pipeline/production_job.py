@@ -191,8 +191,11 @@ def run_test_production_job(
     The edition date and time are supplied explicitly.
     No production slot resolver or automatic schedule is used.
 
-    This mode is intended for controlled testing before
-    automatic publication is enabled.
+    Manual tests are isolated from persistent Event Memory by default.
+    This keeps repeated development runs from consuming the production
+    Mobile/Audio selection. A persistent EventMemory can still be
+    supplied explicitly when a test needs to exercise release-to-release
+    repetition behavior.
     """
 
     if not publication_date:
@@ -214,7 +217,7 @@ def run_test_production_job(
     )
 
     if event_memory is None:
-        event_memory = EventMemory()
+        event_memory = EventMemory(":memory:")
 
     edition = run_edition(
         articles,
