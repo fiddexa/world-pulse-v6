@@ -47,16 +47,76 @@ def _telegram_text(edition_publication):
     return str(value).strip()
 
 
-def _publisher_event(edition_publication):
+TELEGRAM_MESSAGE_LIMIT = 4096
+
+
+def _split_telegram_text(text, max_length=TELEGRAM_MESSAGE_LIMIT):
     """
-    Adapt an edition publication package to the existing
-    TelegramPublisher interface without modifying the package.
+    Split long Telegram text into safe message-sized chunks.
+
+    Prefer paragraph boundaries so the editorial text remains readable.
+    No chunk exceeds Telegram's sendMessage text limit.
+    """
+    text = str(text or "").strip()
+
+    if not text:
+        return []
+
+    if len(text) <= max_length:
+        return [text]
+
+    paragraphs = text.split("\n\n")
+    chunks = []
+    current = ""
+
+    for paragraph in paragraphs:
+        paragraph = paragraph.strip()
+
+        if not paragraph:
+            continue
+
+        candidate = (
+            paragraph
+            if not current
+            else current + "\n\n" + paragraph
+        )
+
+        if len(candidate) <= max_length:
+            current = candidate
+            continue
+
+        if current:
+            chunks.append(current)
+            current = ""
+
+        if len(paragraph) <= max_length:
+            current = paragraph
+            continue
+
+        start = 0
+
+        while start < len(paragraph):
+            end = min(
+                start + max_length,
+                len(paragraph),
+            )
+            chunks.append(paragraph[start:end])
+            start = end
+
+    if current:
+        chunks.append(current)
+
+    return chunks
+
+
+def _publisher_event(edition_publication, text):
+    """
+    Adapt one Telegram chunk to the existing
+    TelegramPublisher interface.
     """
     return {
         "publication": {
-            "telegram": _telegram_text(
-                edition_publication
-            )
+            "telegram": str(text or "").strip()
         }
     }
 
@@ -147,13 +207,9 @@ def publish_edition_to_telegram(
             "edition_id": edition_id,
         }
 
-    result = publisher.publish(
-        _publisher_event(
-            edition_publication
-        )
-    )
+    chunks = _split_telegram_text(text)
 
-    if not isinstance(result, dict):
+    if not chunks:
         log.record_failed(
             edition_publication,
             TELEGRAM,
@@ -163,31 +219,73 @@ def publish_edition_to_telegram(
             "status": "FAILED",
             "channel": TELEGRAM,
             "edition_id": edition_id,
-            "reason": "INVALID_PUBLISHER_RESULT",
+            "reason": "NO_CONTENT",
         }
 
-    status = result.get("status")
+    results = []
 
-    if status == SENT:
-        log.record_sent(
-            edition_publication,
-            TELEGRAM,
+    for index, chunk in enumerate(chunks, start=1):
+        result = publisher.publish(
+            _publisher_event(
+                edition_publication,
+                chunk,
+            )
         )
 
-        return {
-            **result,
-            "edition_id": edition_id,
-        }
+        if not isinstance(result, dict):
+            log.record_failed(
+                edition_publication,
+                TELEGRAM,
+            )
 
-    if status == "FAILED":
-        log.record_failed(
-            edition_publication,
-            TELEGRAM,
-        )
+            return {
+                "status": "FAILED",
+                "channel": TELEGRAM,
+                "edition_id": edition_id,
+                "reason": "INVALID_PUBLISHER_RESULT",
+                "parts_sent": index - 1,
+                "parts_total": len(chunks),
+            }
+
+        results.append(result)
+
+        if result.get("status") != SENT:
+            log.record_failed(
+                edition_publication,
+                TELEGRAM,
+            )
+
+            return {
+                **result,
+                "edition_id": edition_id,
+                "parts_sent": index - 1,
+                "parts_total": len(chunks),
+                "failed_part": index,
+            }
+
+    log.record_sent(
+        edition_publication,
+        TELEGRAM,
+    )
+
+    message_ids = [
+        item.get("message_id")
+        for item in results
+        if isinstance(item, dict)
+        and item.get("message_id") is not None
+    ]
 
     return {
-        **result,
+        "status": SENT,
+        "channel": TELEGRAM,
         "edition_id": edition_id,
+        "parts_total": len(chunks),
+        "message_ids": message_ids,
+        "message_id": (
+            message_ids[0]
+            if len(message_ids) == 1
+            else None
+        ),
     }
 
 

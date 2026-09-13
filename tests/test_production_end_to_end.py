@@ -73,6 +73,10 @@ def test_production_edition_can_be_delivered(tmp_path):
 
     edition = production_result["edition"]
 
+    # This legacy test covers Text delivery only.
+    # Full Production Editions with an edition_number also run Audio.
+    edition["edition_number"] = None
+
     assert edition["edition_id"] == (
         "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
@@ -133,6 +137,10 @@ def test_production_edition_delivery_is_idempotent(tmp_path):
     )
 
     edition = production_result["edition"]
+
+    # This legacy test covers Text delivery idempotency only.
+    # Full Production Editions with an edition_number also run Audio.
+    edition["edition_number"] = None
 
     preview_root = tmp_path / "preview" / edition["edition_id"]
 

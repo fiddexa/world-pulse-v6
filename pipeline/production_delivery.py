@@ -20,6 +20,9 @@ def deliver_production_edition(
     log=None,
     publisher=None,
     approval_manifest_path=None,
+    audio_renderer=None,
+    audio_output_dir="data/audio",
+    audio_publisher=None,
 ) -> dict:
     """
     Publish one already-built production edition.
@@ -37,6 +40,9 @@ def deliver_production_edition(
         log=log,
         publisher=publisher,
         approval_manifest_path=approval_manifest_path,
+        audio_renderer=audio_renderer,
+        audio_output_dir=audio_output_dir,
+        audio_publisher=audio_publisher,
     )
 
     return {
