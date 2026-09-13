@@ -115,9 +115,29 @@ def _event_summary(event: dict[str, Any]) -> str:
 
 
 def _collect_events(edition: dict[str, Any]) -> list[dict[str, Any]]:
+    """
+    Return the canonical Mobile/Audio event sequence.
+
+    For production editions, mobile_audio["events"] is the single
+    authoritative ordered event list shared by Mobile and Audio.
+
+    Legacy/minimal editions keep the previous compatibility fallback.
+    """
+
     mobile_audio = edition.get("mobile_audio")
 
     if isinstance(mobile_audio, dict):
+        canonical_events = mobile_audio.get("events")
+
+        if isinstance(canonical_events, list):
+            return [
+                event
+                for event in canonical_events
+                if isinstance(event, dict)
+                and _event_title(event)
+            ]
+
+        # Legacy mobile_audio structure without explicit events.
         events: list[dict[str, Any]] = []
         seen: set[str] = set()
 
@@ -606,10 +626,6 @@ def build_audio_script(edition: dict[str, Any]) -> str:
 
         if not title:
             continue
-
-        lines.append(
-            f"Story {index}."
-        )
 
         lines.append(
             title
