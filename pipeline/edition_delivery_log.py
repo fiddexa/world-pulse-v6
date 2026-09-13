@@ -14,6 +14,7 @@ from typing import Any
 
 
 TELEGRAM = "telegram"
+TELEGRAM_NEWSPAPER = "telegram_newspaper"
 TELEGRAM_AUDIO = "telegram_audio"
 
 READY = "READY"
@@ -96,6 +97,7 @@ class SQLiteEditionDeliveryLog:
     def _valid_channel(channel: Any) -> bool:
         return channel in {
             TELEGRAM,
+            TELEGRAM_NEWSPAPER,
             TELEGRAM_AUDIO,
         }
 
