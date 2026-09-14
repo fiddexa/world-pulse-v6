@@ -113,3 +113,82 @@ def test_piper_renderer_requires_mp3_output(tmp_path):
             "Test",
             tmp_path / "audio.wav",
         )
+
+
+def test_piper_number_marker_detection():
+    assert PiperTTSRenderer._is_number_marker("ONE.")
+    assert PiperTTSRenderer._is_number_marker("TWO.")
+    assert PiperTTSRenderer._is_number_marker("THREE.")
+    assert PiperTTSRenderer._is_number_marker("TWENTY-ONE.")
+    assert PiperTTSRenderer._is_number_marker("NINETY-NINE.")
+
+    assert not PiperTTSRenderer._is_number_marker("ONE")
+    assert not PiperTTSRenderer._is_number_marker("1.")
+    assert not PiperTTSRenderer._is_number_marker("AROUND.")
+
+
+def test_piper_number_markers_are_split_from_body():
+    script = """AROUND THE MAIN.
+
+September 14, 2026.
+
+ONE.
+
+First title.
+
+First summary.
+
+TWO.
+
+Second title.
+
+Second summary.
+
+THREE.
+
+Third title.
+
+Third summary.
+
+That was Around the Main."""
+
+    assert PiperTTSRenderer._split_number_markers(script) == [
+        (
+            "body",
+            "AROUND THE MAIN.\n\n"
+            "September 14, 2026.",
+        ),
+        ("number", "ONE"),
+        (
+            "body",
+            "First title.\n\n"
+            "First summary.",
+        ),
+        ("number", "TWO"),
+        (
+            "body",
+            "Second title.\n\n"
+            "Second summary.",
+        ),
+        ("number", "THREE"),
+        (
+            "body",
+            "Third title.\n\n"
+            "Third summary.\n\n"
+            "That was Around the Main.",
+        ),
+    ]
+
+
+def test_piper_number_emphasis_configuration():
+    renderer = PiperTTSRenderer(
+        model_path="voice.onnx",
+        piper_binary="piper",
+        ffmpeg_binary="ffmpeg",
+    )
+
+    assert renderer.number_volume == 1.35
+    assert renderer.number_pause_before == 0.60
+    assert renderer.number_pause_after == 0.35
+    assert renderer.sentence_silence == 0.35
+    assert renderer.bitrate == "128k"
