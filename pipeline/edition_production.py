@@ -20,6 +20,7 @@ from pipeline.edition_approval import (
 from pipeline.edition_publication import build_edition_publication
 from pipeline.edition_rendering import render_edition
 from pipeline.telegram_newspaper_runner import (
+    TELEGRAM_NEWSPAPER,
     newspaper_delivery_already_sent,
     publish_edition_newspaper_to_telegram,
 )
@@ -134,17 +135,19 @@ def build_edition_newspaper(
             root,
         )
 
-        full = rendered.get("full_edition")
-        if not isinstance(full, dict):
+        # Social-media publication uses the MOBILE presentation.
+        # The FULL newspaper remains rendered separately for the future website.
+        mobile = rendered.get("mobile_edition")
+        if not isinstance(mobile, dict):
             return {
                 "status": FAILED,
                 "edition_id": edition_id,
-                "reason": "NEWSPAPER_RENDER_FAILED",
+                "reason": "MOBILE_RENDER_FAILED",
             }
 
         files = [
             str(path)
-            for path in (full.get("files") or [])
+            for path in (mobile.get("pages") or [])
             if Path(path).is_file()
         ]
 
@@ -279,6 +282,15 @@ def publish_edition(
             approval_manifest_path=approval_manifest_path,
             log=log,
         )
+
+        # Production owns edition-level idempotency.
+        # Record successful Newspaper delivery even when a custom publisher
+        # (for example, the test publisher) does not write to the log itself.
+        if newspaper_delivery.get("status") == "SENT":
+            log.record_sent(
+                newspaper_delivery_identity,
+                TELEGRAM_NEWSPAPER,
+            )
 
         if newspaper_delivery.get("status") not in {
             "SENT",
