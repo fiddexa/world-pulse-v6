@@ -11,8 +11,22 @@ class MockPublisher:
     def __init__(self):
         self.published = []
 
-    def publish(self, event):
-        self.published.append(event)
+    def __call__(
+        self,
+        edition_id,
+        page_paths,
+        *,
+        edition_number,
+        approval_manifest_path,
+        log,
+    ):
+        self.published.append(
+            {
+                "edition_id": edition_id,
+                "page_paths": page_paths,
+                "edition_number": edition_number,
+            }
+        )
 
         return {
             "status": "SENT",
@@ -55,7 +69,7 @@ def test_production_delivery_sends_edition(tmp_path):
     result = deliver_production_edition(
         edition(),
         log=log,
-        publisher=publisher,
+        newspaper_publisher=publisher,
         approval_manifest_path=approval_manifest,
     )
 
@@ -83,19 +97,21 @@ def test_production_delivery_is_idempotent(tmp_path):
     first = deliver_production_edition(
         edition(),
         log=log,
-        publisher=publisher,
+        newspaper_publisher=publisher,
         approval_manifest_path=approval_manifest,
     )
 
     second = deliver_production_edition(
         edition(),
         log=log,
-        publisher=publisher,
+        newspaper_publisher=publisher,
         approval_manifest_path=approval_manifest,
     )
 
     assert first["status"] == "COMPLETED"
-    assert second["status"] == "SKIPPED"
+    assert second["status"] == "COMPLETED"
+    assert second["delivery"]["status"] == "SKIPPED"
+    assert second["delivery"]["reason"] == "ALREADY_SENT"
     assert len(publisher.published) == 1
 
     log.close()
@@ -146,7 +162,7 @@ def test_production_delivery_does_not_modify_edition(tmp_path):
     deliver_production_edition(
         item,
         log=log,
-        publisher=publisher,
+        newspaper_publisher=publisher,
         approval_manifest_path=approval_manifest,
     )
 
