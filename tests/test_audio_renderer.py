@@ -192,3 +192,30 @@ def test_piper_number_emphasis_configuration():
     assert renderer.number_pause_after == 0.35
     assert renderer.sentence_silence == 0.35
     assert renderer.bitrate == "128k"
+
+
+def test_piper_long_text_prefers_natural_boundaries():
+    text = (
+        "The security council met to mark 25 years since the "
+        "attacks; ambassadors discussed the changing threat, "
+        "artificial intelligence, drones, and encrypted platforms "
+        "for recruitment and attack planning."
+    )
+
+    phrases = PiperTTSRenderer._split_long_text(
+        text,
+        max_words=18,
+    )
+
+    assert len(phrases) > 1
+    assert all(
+        phrase.strip()
+        for phrase in phrases
+    )
+    assert all(
+        len(phrase.split()) <= 18
+        for phrase in phrases
+    )
+
+    rebuilt = " ".join(phrases)
+    assert rebuilt.replace("  ", " ") == text

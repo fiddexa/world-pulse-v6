@@ -261,22 +261,273 @@ def _clean_spoken_text(text: str) -> str:
         text,
     )
 
-    # Expand only the most common TTS-hostile abbreviations.
-    replacements = {
-        r"\bU\.S\.\b": "United States",
-        r"\bU\.K\.\b": "United Kingdom",
-        r"\bE\.U\.\b": "European Union",
-        r"\bUAVs\b": "U A V's",
-        r"\bUAVs\b": "U A V's",
-    }
+    # Expand common TTS-hostile abbreviations.
+    #
+    # Use non-word boundaries here because U.S. / E.U. end in
+    # punctuation, so a trailing \b does not reliably match.
+    replacements = [
+        (r"(?<![A-Za-z])U\.S\.(?![A-Za-z])", "United States"),
+        (r"(?<![A-Za-z])U\.K\.(?![A-Za-z])", "United Kingdom"),
+        (r"(?<![A-Za-z])U\.N\.(?![A-Za-z])", "United Nations"),
+        (r"(?<![A-Za-z])E\.U\.(?![A-Za-z])", "European Union"),
+        (r"(?<![A-Za-z])EU(?![A-Za-z])", "European Union"),
+        (r"(?<![A-Za-z])UK(?![A-Za-z])", "United Kingdom"),
+        (r"(?<![A-Za-z])DR Congo(?![A-Za-z])", "Democratic Republic of the Congo"),
+        (r"(?<![A-Za-z])AI(?![A-Za-z])", "A I"),
+        (r"(?<![A-Za-z0-9])G20(?![A-Za-z0-9])", "G twenty"),
+        (r"(?<![A-Za-z0-9])G7(?![A-Za-z0-9])", "G seven"),
+        (r"\bUAVs\b", "U A V's"),
+    ]
 
-    for pattern, replacement in replacements.items():
+    for pattern, replacement in replacements:
         text = re.sub(
             pattern,
             replacement,
             text,
             flags=re.IGNORECASE,
         )
+
+    # Normalize euro amounts for natural speech.
+    text = re.sub(
+        r"€\s*(\d+(?:\.\d+)?)\s*(billion|million|trillion)?",
+        lambda match: (
+            f"{match.group(1)} "
+            f"{match.group(2) + ' ' if match.group(2) else ''}"
+            "euros"
+        ),
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    # Speak common calendar years naturally instead of as
+    # comma-separated integers such as "2,026".
+    def _spoken_year(match: re.Match[str]) -> str:
+        year = int(match.group(0))
+
+        if 2000 <= year <= 2099:
+            last_two = year % 100
+
+            if last_two == 0:
+                return "two thousand"
+
+            if last_two < 10:
+                return f"twenty oh {last_two}"
+
+            number_words = {
+                10: "ten",
+                11: "eleven",
+                12: "twelve",
+                13: "thirteen",
+                14: "fourteen",
+                15: "fifteen",
+                16: "sixteen",
+                17: "seventeen",
+                18: "eighteen",
+                19: "nineteen",
+                20: "twenty",
+                21: "twenty-one",
+                22: "twenty-two",
+                23: "twenty-three",
+                24: "twenty-four",
+                25: "twenty-five",
+                26: "twenty-six",
+                27: "twenty-seven",
+                28: "twenty-eight",
+                29: "twenty-nine",
+                30: "thirty",
+                31: "thirty-one",
+                32: "thirty-two",
+                33: "thirty-three",
+                34: "thirty-four",
+                35: "thirty-five",
+                36: "thirty-six",
+                37: "thirty-seven",
+                38: "thirty-eight",
+                39: "thirty-nine",
+                40: "forty",
+                41: "forty-one",
+                42: "forty-two",
+                43: "forty-three",
+                44: "forty-four",
+                45: "forty-five",
+                46: "forty-six",
+                47: "forty-seven",
+                48: "forty-eight",
+                49: "forty-nine",
+                50: "fifty",
+                51: "fifty-one",
+                52: "fifty-two",
+                53: "fifty-three",
+                54: "fifty-four",
+                55: "fifty-five",
+                56: "fifty-six",
+                57: "fifty-seven",
+                58: "fifty-eight",
+                59: "fifty-nine",
+                60: "sixty",
+                61: "sixty-one",
+                62: "sixty-two",
+                63: "sixty-three",
+                64: "sixty-four",
+                65: "sixty-five",
+                66: "sixty-six",
+                67: "sixty-seven",
+                68: "sixty-eight",
+                69: "sixty-nine",
+                70: "seventy",
+                71: "seventy-one",
+                72: "seventy-two",
+                73: "seventy-three",
+                74: "seventy-four",
+                75: "seventy-five",
+                76: "seventy-six",
+                77: "seventy-seven",
+                78: "seventy-eight",
+                79: "seventy-nine",
+                80: "eighty",
+                81: "eighty-one",
+                82: "eighty-two",
+                83: "eighty-three",
+                84: "eighty-four",
+                85: "eighty-five",
+                86: "eighty-six",
+                87: "eighty-seven",
+                88: "eighty-eight",
+                89: "eighty-nine",
+                90: "ninety",
+                91: "ninety-one",
+                92: "ninety-two",
+                93: "ninety-three",
+                94: "ninety-four",
+                95: "ninety-five",
+                96: "ninety-six",
+                97: "ninety-seven",
+                98: "ninety-eight",
+                99: "ninety-nine",
+            }
+
+            return f"twenty {number_words[last_two]}"
+
+        if 1900 <= year <= 1999:
+            last_two = year % 100
+
+            if last_two == 0:
+                return "nineteen hundred"
+
+            if last_two < 10:
+                return f"nineteen oh {last_two}"
+
+            number_words = {
+                10: "ten",
+                11: "eleven",
+                12: "twelve",
+                13: "thirteen",
+                14: "fourteen",
+                15: "fifteen",
+                16: "sixteen",
+                17: "seventeen",
+                18: "eighteen",
+                19: "nineteen",
+                20: "twenty",
+                21: "twenty-one",
+                22: "twenty-two",
+                23: "twenty-three",
+                24: "twenty-four",
+                25: "twenty-five",
+                26: "twenty-six",
+                27: "twenty-seven",
+                28: "twenty-eight",
+                29: "twenty-nine",
+                30: "thirty",
+                31: "thirty-one",
+                32: "thirty-two",
+                33: "thirty-three",
+                34: "thirty-four",
+                35: "thirty-five",
+                36: "thirty-six",
+                37: "thirty-seven",
+                38: "thirty-eight",
+                39: "thirty-nine",
+                40: "forty",
+                41: "forty-one",
+                42: "forty-two",
+                43: "forty-three",
+                44: "forty-four",
+                45: "forty-five",
+                46: "forty-six",
+                47: "forty-seven",
+                48: "forty-eight",
+                49: "forty-nine",
+                50: "fifty",
+                51: "fifty-one",
+                52: "fifty-two",
+                53: "fifty-three",
+                54: "fifty-four",
+                55: "fifty-five",
+                56: "fifty-six",
+                57: "fifty-seven",
+                58: "fifty-eight",
+                59: "fifty-nine",
+                60: "sixty",
+                61: "sixty-one",
+                62: "sixty-two",
+                63: "sixty-three",
+                64: "sixty-four",
+                65: "sixty-five",
+                66: "sixty-six",
+                67: "sixty-seven",
+                68: "sixty-eight",
+                69: "sixty-nine",
+                70: "seventy",
+                71: "seventy-one",
+                72: "seventy-two",
+                73: "seventy-three",
+                74: "seventy-four",
+                75: "seventy-five",
+                76: "seventy-six",
+                77: "seventy-seven",
+                78: "seventy-eight",
+                79: "seventy-nine",
+                80: "eighty",
+                81: "eighty-one",
+                82: "eighty-two",
+                83: "eighty-three",
+                84: "eighty-four",
+                85: "eighty-five",
+                86: "eighty-six",
+                87: "eighty-seven",
+                88: "eighty-eight",
+                89: "eighty-nine",
+                90: "ninety",
+                91: "ninety-one",
+                92: "ninety-two",
+                93: "ninety-three",
+                94: "ninety-four",
+                95: "ninety-five",
+                96: "ninety-six",
+                97: "ninety-seven",
+                98: "ninety-eight",
+                99: "ninety-nine",
+            }
+
+            return f"nineteen {number_words[last_two]}"
+
+        return match.group(0)
+
+
+    text = re.sub(
+        r"(?<![A-Za-z0-9])(?:19|20)\d{2}(?![A-Za-z0-9])",
+        _spoken_year,
+        text,
+    )
+
+    # Fix common source-normalization artifacts.
+    text = re.sub(
+        r"\bdont\b",
+        "don't",
+        text,
+        flags=re.IGNORECASE,
+    )
 
     # Common lowercase possessive forms caused by source normalization.
     possessive_fixes = {
@@ -357,21 +608,6 @@ def _spoken_title(text: str) -> str:
     if not text:
         return ""
 
-    # Expand a few common headline conventions.
-    text = re.sub(
-        r"\bU\.S\.\b",
-        "U.S.",
-        text,
-        flags=re.IGNORECASE,
-    )
-
-    text = re.sub(
-        r"\bEU\b",
-        "E.U.",
-        text,
-        flags=re.IGNORECASE,
-    )
-
     # Keep headline semantics intact.
     text = text.rstrip(" .!?")
 
@@ -414,6 +650,133 @@ def _spoken_summary(text: str) -> str:
         normalized += "."
 
     return normalized
+
+
+def _remove_title_overlap(title: str, summary: str) -> str:
+    """
+    Remove a leading summary fragment that substantially repeats
+    the headline.
+
+    The comparison is based on normalized content words. The
+    summary is cut only when its leading content-word run strongly
+    overlaps the headline and enough new information remains.
+    """
+
+    if not title or not summary:
+        return summary
+
+    stopwords = {
+        "a", "an", "the", "and", "or", "but", "to", "of", "in",
+        "on", "for", "from", "by", "with", "at", "as", "is", "are",
+        "was", "were", "be", "been", "being", "this", "that",
+        "these", "those", "ahead", "among", "into", "after",
+        "before", "than", "their", "its", "his", "her", "our",
+        "your", "they", "them",
+    }
+
+    def stem(word: str) -> str:
+        value = word.lower()
+
+        for suffix in (
+            "ingly",
+            "edly",
+            "ing",
+            "ed",
+            "ions",
+            "ion",
+            "ies",
+            "es",
+            "s",
+        ):
+            if (
+                len(value) > len(suffix) + 3
+                and value.endswith(suffix)
+            ):
+                value = value[:-len(suffix)]
+                break
+
+        return value
+
+    def content_tokens(text: str) -> list[str]:
+        words = re.findall(r"[A-Za-z]+", text.lower())
+        return [
+            stem(word)
+            for word in words
+            if word not in stopwords
+        ]
+
+    title_tokens = content_tokens(title)
+
+    if len(title_tokens) < 3:
+        return summary
+
+    title_set = set(title_tokens)
+
+    summary_words = summary.split()
+
+    # Map every original summary word to its normalized content token.
+    normalized_words: list[tuple[int, str]] = []
+
+    for index, word in enumerate(summary_words):
+        tokens = re.findall(r"[A-Za-z]+", word.lower())
+
+        for token in tokens:
+            if token not in stopwords:
+                normalized_words.append(
+                    (index, stem(token))
+                )
+
+    if not normalized_words:
+        return summary
+
+    # Look only at the leading run. We do not want to remove
+    # legitimate later references to the headline topic.
+    matched_positions: list[int] = []
+    seen_non_title = 0
+
+    for token_position, (word_index, token) in enumerate(
+        normalized_words
+    ):
+        if token in title_set:
+            matched_positions.append(word_index)
+        else:
+            seen_non_title += 1
+
+        # Once two genuinely new content words appear at the
+        # beginning, the headline overlap has ended.
+        if seen_non_title >= 2:
+            break
+
+    if len(matched_positions) < 3:
+        return summary
+
+    matched_unique = len(
+        {
+            normalized_words[pos][1]
+            for pos, (_, token) in enumerate(normalized_words)
+            if pos < len(matched_positions)
+            and token in title_set
+        }
+    )
+
+    coverage = matched_unique / len(title_set)
+
+    if coverage < 0.65:
+        return summary
+
+    # Cut after the LAST original word belonging to the initial
+    # overlapping run, so trailing headline words such as "Usmanov"
+    # are not left behind.
+    last_overlap_word_index = max(matched_positions)
+
+    remainder = " ".join(
+        summary_words[last_overlap_word_index + 1:]
+    ).strip(" ,;:-")
+
+    if len(remainder.split()) < 6:
+        return summary
+
+    return remainder
 
 def _event_source(event: dict[str, Any]) -> str:
     """
@@ -606,6 +969,108 @@ def build_audio_script(edition: dict[str, Any]) -> str:
             f"{edition_label}."
         )
 
+    number_words = {
+        1: "ONE",
+        2: "TWO",
+        3: "THREE",
+        4: "FOUR",
+        5: "FIVE",
+        6: "SIX",
+        7: "SEVEN",
+        8: "EIGHT",
+        9: "NINE",
+        10: "TEN",
+        11: "ELEVEN",
+        12: "TWELVE",
+        13: "THIRTEEN",
+        14: "FOURTEEN",
+        15: "FIFTEEN",
+        16: "SIXTEEN",
+        17: "SEVENTEEN",
+        18: "EIGHTEEN",
+        19: "NINETEEN",
+        20: "TWENTY",
+        21: "TWENTY-ONE",
+        22: "TWENTY-TWO",
+        23: "TWENTY-THREE",
+        24: "TWENTY-FOUR",
+        25: "TWENTY-FIVE",
+        26: "TWENTY-SIX",
+        27: "TWENTY-SEVEN",
+        28: "TWENTY-EIGHT",
+        29: "TWENTY-NINE",
+        30: "THIRTY",
+        31: "THIRTY-ONE",
+        32: "THIRTY-TWO",
+        33: "THIRTY-THREE",
+        34: "THIRTY-FOUR",
+        35: "THIRTY-FIVE",
+        36: "THIRTY-SIX",
+        37: "THIRTY-SEVEN",
+        38: "THIRTY-EIGHT",
+        39: "THIRTY-NINE",
+        40: "FORTY",
+        41: "FORTY-ONE",
+        42: "FORTY-TWO",
+        43: "FORTY-THREE",
+        44: "FORTY-FOUR",
+        45: "FORTY-FIVE",
+        46: "FORTY-SIX",
+        47: "FORTY-SEVEN",
+        48: "FORTY-EIGHT",
+        49: "FORTY-NINE",
+        50: "FIFTY",
+        51: "FIFTY-ONE",
+        52: "FIFTY-TWO",
+        53: "FIFTY-THREE",
+        54: "FIFTY-FOUR",
+        55: "FIFTY-FIVE",
+        56: "FIFTY-SIX",
+        57: "FIFTY-SEVEN",
+        58: "FIFTY-EIGHT",
+        59: "FIFTY-NINE",
+        60: "SIXTY",
+        61: "SIXTY-ONE",
+        62: "SIXTY-TWO",
+        63: "SIXTY-THREE",
+        64: "SIXTY-FOUR",
+        65: "SIXTY-FIVE",
+        66: "SIXTY-SIX",
+        67: "SIXTY-SEVEN",
+        68: "SIXTY-EIGHT",
+        69: "SIXTY-NINE",
+        70: "SEVENTY",
+        71: "SEVENTY-ONE",
+        72: "SEVENTY-TWO",
+        73: "SEVENTY-THREE",
+        74: "SEVENTY-FOUR",
+        75: "SEVENTY-FIVE",
+        76: "SEVENTY-SIX",
+        77: "SEVENTY-SEVEN",
+        78: "SEVENTY-EIGHT",
+        79: "SEVENTY-NINE",
+        80: "EIGHTY",
+        81: "EIGHTY-ONE",
+        82: "EIGHTY-TWO",
+        83: "EIGHTY-THREE",
+        84: "EIGHTY-FOUR",
+        85: "EIGHTY-FIVE",
+        86: "EIGHTY-SIX",
+        87: "EIGHTY-SEVEN",
+        88: "EIGHTY-EIGHT",
+        89: "EIGHTY-NINE",
+        90: "NINETY",
+        91: "NINETY-ONE",
+        92: "NINETY-TWO",
+        93: "NINETY-THREE",
+        94: "NINETY-FOUR",
+        95: "NINETY-FIVE",
+        96: "NINETY-SIX",
+        97: "NINETY-SEVEN",
+        98: "NINETY-EIGHT",
+        99: "NINETY-NINE",
+    }
+
     for index, event in enumerate(
         production_events,
         start=1,
@@ -615,6 +1080,11 @@ def build_audio_script(edition: dict[str, Any]) -> str:
         )
 
         raw_summary = _event_summary(event)
+
+        raw_summary = _remove_title_overlap(
+            title,
+            raw_summary,
+        )
 
         summary = _spoken_summary(
             raw_summary
@@ -626,6 +1096,13 @@ def build_audio_script(edition: dict[str, Any]) -> str:
 
         if not title:
             continue
+
+        lines.append(
+            number_words.get(
+                index,
+                str(index),
+            ) + "."
+        )
 
         lines.append(
             title
