@@ -1806,6 +1806,99 @@ def render_mobile_edition(
             print(f"[WARN] Failed to draw footer: {exc}")
 
             
+    def _draw_stretched_value(
+        canvas: Image.Image,
+        text: str,
+        x: int,
+        y: int,
+        *,
+        scale_x: float = 1.06,
+        max_right: int | None = None,
+    ) -> None:
+        """
+        Draw only the market VALUE text with horizontal stretching.
+
+        Labels such as INDEXES / COMMODITIES remain unchanged.
+        """
+
+        font = _font(11)
+
+        probe = Image.new(
+            "RGBA",
+            (1600, 80),
+            (0, 0, 0, 0),
+        )
+        probe_draw = ImageDraw.Draw(probe)
+
+        bbox = probe_draw.textbbox(
+            (0, 0),
+            text,
+            font=font,
+        )
+
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+
+        if text_width <= 0 or text_height <= 0:
+            return
+
+        effective_scale = scale_x
+
+        if max_right is not None:
+            available = max_right - x
+
+            if available <= 0:
+                return
+
+            effective_scale = min(
+                effective_scale,
+                available / text_width,
+            )
+
+        layer = Image.new(
+            "RGBA",
+            (
+                text_width + 8,
+                text_height + 8,
+            ),
+            (0, 0, 0, 0),
+        )
+
+        layer_draw = ImageDraw.Draw(layer)
+
+        layer_draw.text(
+            (
+                4 - bbox[0],
+                4 - bbox[1],
+            ),
+            text,
+            font=font,
+            fill=GRAY,
+        )
+
+        new_width = max(
+            layer.width + 1,
+            int(layer.width * effective_scale),
+        )
+
+        layer = layer.resize(
+            (
+                new_width,
+                layer.height,
+            ),
+            Image.Resampling.LANCZOS,
+        )
+
+        canvas.paste(
+            layer,
+            (
+                x,
+                y,
+            ),
+            layer,
+        )
+
+
     def draw_markets_today(
         canvas: Image.Image,
         draw: ImageDraw.ImageDraw,
@@ -1813,12 +1906,50 @@ def render_mobile_edition(
     ) -> None:
         """
         Compact MARKETS TODAY panel.
-        Market snapshot for the test edition.
+
+        Values come from the edition's immutable market snapshot.
+        The renderer never fetches market data itself.
         """
+
+        snapshot = edition.get("market_snapshot") or {}
+        quotes = snapshot.get("quotes") or {}
+
+        def quote_text(
+            key: str,
+            label: str,
+            *,
+            prefix: str = "",
+            decimals: int = 2,
+        ) -> str:
+            quote = quotes.get(key) or {}
+
+            value = quote.get("value")
+            change = quote.get("change_pct")
+
+            if not isinstance(value, (int, float)):
+                return f"{label}  —"
+
+            value_text = f"{value:,.{decimals}f}"
+
+            if prefix:
+                value_text = f"{prefix}{value_text}"
+
+            if isinstance(change, (int, float)):
+                sign = "+" if change >= 0 else ""
+                change_text = (
+                    f"{sign}{change:.2f}%"
+                )
+                return (
+                    f"{label}  {value_text}  "
+                    f"{change_text}"
+                )
+
+            return f"{label}  {value_text}"
 
         # -------------------------------------------------------------
         # MARKETS TODAY — TITLE
         # -------------------------------------------------------------
+
         draw.text(
             (MARGIN, y),
             "MARKETS TODAY",
@@ -1829,8 +1960,8 @@ def render_mobile_edition(
         # -------------------------------------------------------------
         # ROW 1 — INDEXES
         # -------------------------------------------------------------
-        row1_y = y + 22
 
+        row1_y = y + 22
         label = "INDEXES"
 
         draw.text(
@@ -1848,18 +1979,35 @@ def render_mobile_edition(
 
         data_x = label_bbox[2] + 10
 
-        draw.text(
-            (data_x, row1_y),
-            "S&P 500  7,747.71  +1.06%   |   NASDAQ  26,584.06  +1.40%   |   DOW  53,686.11  +1.18%",
-            font=_font(11),
-            fill=GRAY,
+        indexes = "   |   ".join(
+            [
+                quote_text(
+                    "sp500",
+                    "S&P 500",
+                    decimals=2,
+                ),
+                quote_text(
+                    "dow",
+                    "DOW",
+                    decimals=2,
+                ),
+            ]
+        )
+
+        _draw_stretched_value(
+            canvas,
+            indexes,
+            data_x,
+            row1_y - 4,
+            scale_x=1.06,
+            max_right=WIDTH - MARGIN,
         )
 
         # -------------------------------------------------------------
         # ROW 2 — COMMODITIES
         # -------------------------------------------------------------
-        row2_y = y + 40
 
+        row2_y = y + 40
         label = "COMMODITIES"
 
         draw.text(
@@ -1877,18 +2025,43 @@ def render_mobile_edition(
 
         data_x = label_bbox[2] + 10
 
-        draw.text(
-            (data_x, row2_y),
-            "BRENT  $95.69  +0.46%   |   GOLD  $4,520.40  +0.96%   |   WTI  $91.71  +1.01%",
-            font=_font(11),
-            fill=GRAY,
+        commodities = "   |   ".join(
+            [
+                quote_text(
+                    "brent",
+                    "BRENT",
+                    prefix="$",
+                    decimals=2,
+                ),
+                quote_text(
+                    "gold",
+                    "GOLD",
+                    prefix="$",
+                    decimals=2,
+                ),
+                quote_text(
+                    "wti",
+                    "WTI",
+                    prefix="$",
+                    decimals=2,
+                ),
+            ]
+        )
+
+        _draw_stretched_value(
+            canvas,
+            commodities,
+            data_x,
+            row2_y - 4,
+            scale_x=1.06,
+            max_right=WIDTH - MARGIN,
         )
 
         # -------------------------------------------------------------
         # ROW 3 — CURRENCY / GLOBAL
         # -------------------------------------------------------------
-        row3_y = y + 58
 
+        row3_y = y + 58
         label = "CURRENCY / GLOBAL"
 
         draw.text(
@@ -1906,40 +2079,33 @@ def render_mobile_edition(
 
         data_x = label_bbox[2] + 10
 
-        draw.text(
-            (data_x, row3_y),
-            "EUR/USD  1.1627   |   DXY  99.12  +0.27%   |   USD/CNY  6.7113  -0.11%",
-            font=_font(11),
-            fill=GRAY,
+        currencies = "   |   ".join(
+            [
+                quote_text(
+                    "eur_usd",
+                    "EUR/USD",
+                    decimals=4,
+                ),
+                quote_text(
+                    "usd_cny",
+                    "USD/CNY",
+                    decimals=4,
+                ),
+                quote_text(
+                    "dxy",
+                    "DXY",
+                    decimals=2,
+                ),
+            ]
         )
 
-        # -------------------------------------------------------------
-        # ROW 4 — MARKET LEADERS
-        # -------------------------------------------------------------
-        row4_y = y + 76
-
-        label = "MARKET LEADERS"
-
-        draw.text(
-            (MARGIN, row4_y),
-            label,
-            font=_font(12, bold=True),
-            fill=BLACK,
-        )
-
-        label_bbox = draw.textbbox(
-            (MARGIN, row4_y),
-            label,
-            font=_font(12, bold=True),
-        )
-
-        data_x = label_bbox[2] + 10
-
-        draw.text(
-            (data_x, row4_y),
-            "NVIDIA  +1.80%   |   APPLE  +1.00%   |   TESLA  +5.42%",
-            font=_font(11),
-            fill=GRAY,
+        _draw_stretched_value(
+            canvas,
+            currencies,
+            data_x,
+            row3_y - 4,
+            scale_x=1.06,
+            max_right=WIDTH - MARGIN,
         )
 
     for page_number, page_events in enumerate(
