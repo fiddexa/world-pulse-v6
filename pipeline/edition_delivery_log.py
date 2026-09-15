@@ -14,6 +14,7 @@ from typing import Any
 
 
 TELEGRAM = "telegram"
+TELEGRAM_NEWSPAPER = "telegram_newspaper"
 
 READY = "READY"
 SENT = "SENT"
@@ -93,7 +94,10 @@ class SQLiteEditionDeliveryLog:
 
     @staticmethod
     def _valid_channel(channel: Any) -> bool:
-        return channel == TELEGRAM
+        return channel in {
+            TELEGRAM,
+            TELEGRAM_NEWSPAPER,
+        }
 
     def has_been_sent(
         self,
