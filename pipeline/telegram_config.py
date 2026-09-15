@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Telegram Configuration
+AROUND THE MAIN v6 - Telegram Configuration
 
 Reads Telegram configuration from environment variables.
 

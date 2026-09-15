@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Delivery Policy Layer
+AROUND THE MAIN v6 - Delivery Policy Layer
 
 Determines whether prepared publication content is ready for delivery.
 

@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Telegram HTTP Transport
+AROUND THE MAIN v6 - Telegram HTTP Transport
 
 Small transport adapter for Telegram Bot API.
 

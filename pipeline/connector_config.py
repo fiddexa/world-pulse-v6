@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Connector Configuration
+AROUND THE MAIN v6 - Connector Configuration
 
 Defines which source connector types are enabled in production.
 
@@ -29,12 +29,37 @@ CONNECTOR_REGISTRY = {
 
     "bbc": {
         "type": CONNECTOR_RSS,
-        "enabled": False,
+        "enabled": True,
+    },
+
+    "dw": {
+        "type": CONNECTOR_RSS,
+        "enabled": True,
+    },
+
+    "euronews": {
+        "type": CONNECTOR_RSS,
+        "enabled": True,
     },
 
     "afp": {
         "type": CONNECTOR_LICENSED,
         "enabled": False,
+    },
+
+    "uk_gov": {
+        "type": CONNECTOR_RSS,
+        "enabled": True,
+    },
+
+    "canada_news": {
+        "type": CONNECTOR_RSS,
+        "enabled": True,
+    },
+
+    "european_commission": {
+        "type": CONNECTOR_RSS,
+        "enabled": True,
     },
 
     "un": {

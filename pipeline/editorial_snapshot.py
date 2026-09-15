@@ -1,11 +1,11 @@
 """
-WORLD PULSE v6 - Editorial Snapshot
+AROUND THE MAIN v6 - Editorial Snapshot
 
 Defines the time boundary for a single edition's editorial view.
 
 The snapshot answers one question:
 
-    Was this information available to WORLD PULSE by the time
+    Was this information available to AROUND THE MAIN by the time
     the edition was being prepared?
 
 This layer does not decide whether an event is important. It only
@@ -80,7 +80,7 @@ def _timestamp_group(event: dict, key: str) -> list[datetime]:
 
 def _availability_dates(event: dict) -> list[datetime]:
     """
-    Return the best available WORLD PULSE information timestamps.
+    Return the best available AROUND THE MAIN information timestamps.
 
     Timestamp precedence is deliberate:
 
@@ -111,7 +111,7 @@ def first_known_at(event: Any) -> datetime | None:
     information-availability tier.
 
     This is deliberately different from event_time. An event may occur
-    before WORLD PULSE receives reliable information about it.
+    before AROUND THE MAIN receives reliable information about it.
     """
 
     if not isinstance(event, dict):

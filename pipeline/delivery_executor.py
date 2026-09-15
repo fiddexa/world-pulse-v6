@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Delivery Executor
+AROUND THE MAIN v6 - Delivery Executor
 
 Coordinates delivery policy, idempotency state, and publishers.
 

@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Edition ID
+AROUND THE MAIN v6 - Edition ID
 
 Provides deterministic identifiers for publication editions.
 """
@@ -23,7 +23,7 @@ def build_edition_id(
     Build a stable Edition ID.
 
     Example:
-        WORLD-PULSE-EN-2026-08-30-0700
+        AROUND-THE-MAIN-EN-2026-08-30-0700
     """
 
     if not language or not isinstance(language, str):
@@ -94,7 +94,7 @@ def build_edition_id(
         )
 
     return (
-        f"WORLD-PULSE-"
+        f"AROUND-THE-MAIN-"
         f"{normalized_language}-"
         f"{local_date.isoformat()}-"
         f"{hour:02d}{minute:02d}"

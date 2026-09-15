@@ -1,17 +1,17 @@
-# WORLD PULSE v6 — FINAL TECHNICAL SPECIFICATION v1.1
+# AROUND THE MAIN v6 — FINAL TECHNICAL SPECIFICATION v1.1
 
 **Status:** Master Technical Specification
-**Project:** WORLD PULSE v6
+**Project:** AROUND THE MAIN v6
 **Current publication language:** English
 **Primary audience timezone:** `America/New_York`
 **Daily editions:** 07:00, 13:00, 20:00
-**Primary Telegram channel:** `@WorldPulseDaily`
+**Primary Telegram channel:** `@aroundthemain`
 
 ---
 
 ## 1. PROJECT PURPOSE
 
-WORLD PULSE is an automated international news publication system designed to transform verified global news into concise, neutral, contextualized newspaper-style editions.
+AROUND THE MAIN is an automated international news publication system designed to transform verified global news into concise, neutral, contextualized newspaper-style editions.
 
 Core editorial principle:
 
@@ -19,7 +19,7 @@ Core editorial principle:
 
 Secondary principle:
 
-> **FACTS FIRST. CONTEXT SECOND.**
+> **VERIFIED FACTS. CLEAR SOURCES. NO AUTOMATED OPINION.**
 
 The system must ultimately operate autonomously after final production deployment.
 
@@ -35,7 +35,7 @@ The first production channel is an English-language international news channel.
 
 - Language: **English**
 - Audience timezone: **America/New_York**
-- Telegram channel: **@WorldPulseDaily**
+- Telegram channel: **@aroundthemain**
 - Editions per day: **3**
 
 ### Daily publication times
@@ -63,7 +63,7 @@ Future language channels may use different audience timezones and schedules.
 
 # 3. AUTONOMOUS OPERATION
 
-After production launch, WORLD PULSE must operate without:
+After production launch, AROUND THE MAIN must operate without:
 
 -  an open browser;
 -  an open ChatGPT session;
@@ -161,7 +161,7 @@ Example conceptual format:
 
 
 ```
-WORLD-PULSE-EN-2026-08-30-0700
+AROUND-THE-MAIN-EN-2026-08-30-0700
 ```
 
 The exact implementation format may be finalized during the Edition ID phase.
@@ -203,7 +203,7 @@ The publication operation itself occurs at the scheduled time.
 
 # 7. EDITORIAL PRINCIPLES
 
-WORLD PULSE must be:
+AROUND THE MAIN must be:
 
 -  factual;
 -  neutral;
@@ -407,7 +407,7 @@ many duplicate stories
 
 # 16. EVENT MEMORY
 
-WORLD PULSE requires persistent event memory.
+AROUND THE MAIN requires persistent event memory.
 
 The target operational memory is approximately 30 days for recent events.
 
@@ -472,31 +472,51 @@ Final selection remains subject to editorial rules.
 
 # 19. CONTENT STRUCTURE
 
-WORLD PULSE content should prioritize:
+AROUND THE MAIN is a news-first international publication.
+
+Public news content must prioritize:
+
+- verified facts;
+- concise summaries;
+- reliable source attribution;
+- verification status;
+- international significance;
+- freshness;
+- editorial relevance.
 
 ### WHAT HAPPENED
 
-A concise factual statement.
+A concise factual statement describing the event.
 
-### WHY IT MATTERS
+### SUMMARY
 
-A concise explanation of international relevance.
+A concise factual summary based on verified information.
 
-### WHAT TO WATCH
+### SOURCES AND VERIFICATION
 
-Where appropriate, a concise indication of what developments should be monitored next.
+Every published story must retain source attribution and an appropriate verification status.
+
+Public editions must NOT include automatically generated:
+
+- editorial opinion;
+- political interpretation;
+- unsupported predictions;
+- statements telling the reader what conclusion to adopt;
+- assumptions presented as facts.
 
 The system must never invent:
 
--  motives;
--  casualty figures;
--  quotations;
--  future outcomes;
--  political intentions;
--  economic forecasts;
--  technical explanations;
+- motives;
+- casualty figures;
+- quotations;
+- future outcomes;
+- political intentions;
+- economic forecasts;
+- technical explanations;
 
 unless supported by reliable evidence.
+
+If the available information is insufficiently verified, the story should be held for editorial review rather than filled with assumptions or generated interpretation.
 
 ---
 
@@ -809,8 +829,8 @@ The current production target is:
 
 
 ```
-WorldPulseDaily
-@WorldPulseDaily
+aroundthemain
+@aroundthemain
 ```
 
 Telegram API access has already been successfully verified.
@@ -1384,7 +1404,7 @@ Only after the final production rehearsal succeeds should autonomous publication
 
 # 51. VERSION CONTROL
 
-This document is the current master technical specification for WORLD PULSE v6.
+This document is the current master technical specification for AROUND THE MAIN v6.
 
 Current version:
 
@@ -1416,7 +1436,7 @@ Future changes must be explicitly reflected in the version history.
 
 # 52. DEFINITION OF PRODUCTION COMPLETE
 
-WORLD PULSE is considered production-complete only when:
+AROUND THE MAIN is considered production-complete only when:
 
 -  the complete pipeline runs successfully;
 -  the edition is prepared before publication;
@@ -1443,7 +1463,7 @@ Only then may autonomous production be activated.
 
 # 53. MASTER PROJECT RULE
 
-This document is the controlling technical reference for WORLD PULSE v6.
+This document is the controlling technical reference for AROUND THE MAIN v6.
 
 When a new architectural or product decision is approved, it must be reflected in this document before the implementation is considered complete.
 
@@ -1455,8 +1475,8 @@ No important production requirement should exist only in chat history.
 
 ---
 
-**WORLD PULSE v6**
+**AROUND THE MAIN v6**
 
 **MINIMUM TEXT. MAXIMUM MEANING.**
 
-**FACTS FIRST. CONTEXT SECOND.**
+**VERIFIED FACTS. CLEAR SOURCES. NO AUTOMATED OPINION.**

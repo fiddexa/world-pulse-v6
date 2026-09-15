@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Feed Configuration
+AROUND THE MAIN v6 - Feed Configuration
 
 Production RSS/Atom feed configuration.
 
@@ -21,7 +21,16 @@ FEED_REGISTRY = {
 
     "associated_press": [],
 
-    "bbc": [],
+    "bbc": [
+        {
+            "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+            "source": "BBC",
+            "name": "BBC World",
+            "type": "rss",
+            "requires_auth": False,
+            "category": "world",
+        },
+    ],
 
     "afp": [],
 
@@ -39,6 +48,73 @@ FEED_REGISTRY = {
         },
     ],
 
+    "dw": [
+        {
+            "url": "https://rss.dw.com/rdf/rss-en-world",
+            "source": "DW",
+            "name": "DW World",
+            "type": "rss",
+            "requires_auth": False,
+            "category": "world",
+        },
+    ],
+
+    "euronews": [
+        {
+            "url": "https://www.euronews.com/rss",
+            "source": "Euronews",
+            "name": "Euronews",
+            "type": "rss",
+            "requires_auth": False,
+            "category": "world",
+        },
+    ],
+
+
+    "uk_gov": [
+        {
+            "url": "https://www.gov.uk/search/news-and-communications.atom",
+            "source": "uk_gov",
+            "name": "GOV.UK News and Communications",
+            "type": "rss",
+            "requires_auth": False,
+            "category": "world",
+        },
+    ],
+
+    "canada_news": [
+        {
+            "url": (
+                "https://api.io.canada.ca/io-server/gc/news/en/v2"
+                "?atomtitle=National+News"
+                "&format=atom"
+                "&orderBy=desc"
+                "&pick=100"
+                "&publishedDate%3E=2021-10-25"
+                "&sort=publishedDate"
+            ),
+            "source": "canada_news",
+            "name": "Canada National News",
+            "type": "rss",
+            "requires_auth": False,
+            "category": "world",
+        },
+    ],
+
+    "european_commission": [
+        {
+            "url": (
+                "https://ec.europa.eu/commission/presscorner/api/rss"
+                "?language=en"
+            ),
+            "source": "european_commission",
+            "name": "European Commission Press Corner",
+            "type": "rss",
+            "requires_auth": False,
+            "category": "world",
+        },
+    ],
+
     "imf": [],
 
     "world_bank": [],
@@ -49,50 +125,6 @@ FEED_REGISTRY = {
 
     "opec": [],
 }
-
-CONNECTOR_REGISTRY = {
-    "reuters": {
-        "type": "licensed",
-        "enabled": False,
-    },
-    "associated_press": {
-        "type": "api",
-        "enabled": False,
-    },
-    "bbc": {
-        "type": "licensed",
-        "enabled": False,
-    },
-    "afp": {
-        "type": "licensed",
-        "enabled": False,
-    },
-    "un": {
-        "type": "rss",
-        "enabled": True,
-    },
-    "imf": {
-        "type": "rss",
-        "enabled": False,
-    },
-    "world_bank": {
-        "type": "api",
-        "enabled": False,
-    },
-    "who": {
-        "type": "rss",
-        "enabled": False,
-    },
-    "iea": {
-        "type": "rss",
-        "enabled": False,
-    },
-    "opec": {
-        "type": "rss",
-        "enabled": False,
-    },
-}
-
 
 def get_connector_config(source=None):
     """

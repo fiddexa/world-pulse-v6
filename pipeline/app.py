@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Application Pipeline
+AROUND THE MAIN v6 - Application Pipeline
 
 Orchestrates the processing layers:
 
@@ -77,7 +77,7 @@ def _build_editorial_time(publication_date, edition_time):
 
 def process_articles(articles, *, editorial_time=None):
     """
-    Run the complete World Pulse v6 processing pipeline.
+    Run the complete AROUND THE MAIN v6 processing pipeline.
 
     When editorial_time is supplied, only information known by that
     Editorial Snapshot is processed. This keeps each edition tied to
@@ -194,6 +194,13 @@ def process_articles(articles, *, editorial_time=None):
 
     editorial = decide_events(ranked)
 
+    # AI-generated editorial visuals are the default visual format
+    # for selected stories.
+    #
+    # One event -> one reusable image asset.
+    # Branding is applied programmatically by ai_visuals.py.
+    #
+    # Generation failures do not attach unrelated images.
     content = build_contents(editorial)
 
     publication = build_publications(content)
@@ -210,9 +217,10 @@ def build_edition_from_articles(
     *,
     event_memory=None,
     editorial_time=None,
+    exclude_ignored=False,
 ):
     """
-    Process articles and build a WORLD PULSE edition.
+    Process articles and build a AROUND THE MAIN edition.
 
     The publication date and edition time define the Editorial
     Snapshot boundary. Information that became available after that
@@ -233,12 +241,16 @@ def build_edition_from_articles(
         editorial,
         publication_date=publication_date,
         edition_time=edition_time,
+        event_memory=event_memory,
+        exclude_ignored=exclude_ignored,
     )
 
     edition_id = edition.get("edition_id")
 
     if event_memory is not None and edition_id:
-        for event in editorial:
+        used_events = edition.get("ordered") or []
+
+        for event in used_events:
             event_memory.remember(
                 event,
                 edition_id=edition_id,

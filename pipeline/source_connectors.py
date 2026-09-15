@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Source Connector Layer
+AROUND THE MAIN v6 - Source Connector Layer
 
 Provides a common interface for source-specific ingestion.
 
@@ -45,7 +45,7 @@ def normalize_connector_article(
     first_seen_at: datetime | None = None,
 ) -> dict:
     """
-    Convert connector output into the common WORLD PULSE article format.
+    Convert connector output into the common AROUND THE MAIN article format.
     """
 
     if not isinstance(article, dict):
@@ -59,10 +59,30 @@ def normalize_connector_article(
     )
 
     if first_seen_at is None:
-        first_seen_at = utc_now()
+        existing_first_seen = result.get("first_seen_at")
 
-    if not result.get("first_seen_at"):
-        result["first_seen_at"] = first_seen_at.isoformat()
+        if existing_first_seen:
+            first_seen_at = existing_first_seen
+        else:
+            published_at = result.get("published_at")
+
+            if published_at:
+                result["first_seen_at"] = str(
+                    published_at
+                ).strip()
+
+    if (
+        first_seen_at is not None
+        and not result.get("first_seen_at")
+    ):
+        if isinstance(first_seen_at, datetime):
+            result["first_seen_at"] = (
+                first_seen_at.isoformat()
+            )
+        else:
+            result["first_seen_at"] = str(
+                first_seen_at
+            ).strip()
 
     return result
 
@@ -116,10 +136,54 @@ class RSSConnector(SourceConnector):
         if not self.enabled or not self.feeds:
             return []
 
-        articles = self.collector(
-            self.feeds,
-            timeout=self.timeout,
-        )
+        articles = []
+
+        for feed in self.feeds:
+            if not isinstance(feed, dict):
+                continue
+
+            feed_url = str(
+                feed.get("url") or ""
+            ).strip()
+
+            if not feed_url:
+                continue
+
+            source = str(
+                feed.get("source") or self.source
+            ).strip() or self.source
+
+            try:
+                result = self.collector(
+                    feed_url,
+                    source=source,
+                    timeout=self.timeout,
+                )
+            except TypeError as exc:
+                # The canonical collector.collect() accepts a feed
+                # definition/list, not source= as a keyword.
+                # Retry only for that interface mismatch.
+                message = str(exc)
+
+                if "unexpected keyword argument 'source'" not in message:
+                    raise
+
+                result = self.collector(
+                    [
+                        {
+                            "url": feed_url,
+                            "source": source,
+                        }
+                    ],
+                    timeout=self.timeout,
+                )
+
+            if isinstance(result, list):
+                articles.extend(
+                    article
+                    for article in result
+                    if isinstance(article, dict)
+                )
 
         return [
             normalize_connector_article(

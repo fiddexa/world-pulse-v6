@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Edition Builder
+AROUND THE MAIN v6 - Edition Builder
 
 Builds a deterministic editorial edition from processed events.
 
@@ -7,10 +7,17 @@ This layer does not generate or rewrite news.
 It only decides how already-processed events should be
 organized into an edition.
 """
+import re
 
+from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
-from pipeline.edition_id import build_edition_id
+from pipeline.edition_id import (
+    DEFAULT_TIMEZONE,
+    build_edition_id,
+)
+from pipeline.edition_slots import EDITION_SLOTS
 
 
 SECTION_ORDER = (
@@ -29,10 +36,53 @@ SECTION_ORDER = (
 
 
 ROLE_ORDER = (
+    "LEAD_STORY",
     "TOP_STORY",
+    "SECTION_STORY",
     "MAIN_STORY",
     "BRIEF",
 )
+
+
+def _previous_release_datetime(
+    publication_date,
+    edition_time,
+):
+    """
+    Return the canonical previous scheduled release time.
+
+    Release windows are:
+        07:00 <- 20:00 previous day
+        13:00 <- 07:00 same day
+        20:00 <- 13:00 same day
+    """
+
+    if not publication_date or not edition_time:
+        return None
+
+    try:
+        current_date = datetime.fromisoformat(
+            str(publication_date)
+        ).date()
+
+        current_index = EDITION_SLOTS.index(
+            str(edition_time)
+        )
+    except (ValueError, TypeError):
+        return None
+
+    if current_index == 0:
+        previous_date = current_date - timedelta(days=1)
+        previous_time = EDITION_SLOTS[-1]
+    else:
+        previous_date = current_date
+        previous_time = EDITION_SLOTS[current_index - 1]
+
+    return datetime.fromisoformat(
+        f"{previous_date.isoformat()}T{previous_time}"
+    ).replace(
+        tzinfo=ZoneInfo(DEFAULT_TIMEZONE)
+    )
 
 
 def _safe_number(value: Any) -> float:
@@ -74,10 +124,22 @@ def _role(event: dict) -> str:
     role = editorial.get("role")
 
     if role:
-        return str(role).strip().upper()
+        value = str(role).strip().upper()
+
+        aliases = {
+            "FRONT_PAGE": "LEAD_STORY",
+            "LEAD_STORY": "LEAD_STORY",
+            "TOP_STORY": "TOP_STORY",
+            "IMPORTANT": "SECTION_STORY",
+            "SECTION_STORY": "SECTION_STORY",
+            "MAIN_STORY": "MAIN_STORY",
+            "STANDARD": "BRIEF",
+            "BRIEF": "BRIEF",
+        }
+
+        return aliases.get(value, value)
 
     return "BRIEF"
-
 
 def _section(event: dict) -> str:
     """
@@ -144,24 +206,665 @@ def _is_publishable(event: dict) -> bool:
     }
 
 
+def _decision(event: dict) -> str:
+    editorial = _editorial(event)
+
+    return str(
+        editorial.get(
+            "decision",
+            "",
+        )
+    ).strip().upper()
+
+
 def _sort_key(event: dict) -> tuple:
     role = _role(event)
+    decision = _decision(event)
 
     try:
         role_index = ROLE_ORDER.index(role)
     except ValueError:
         role_index = len(ROLE_ORDER)
 
+    decision_order = {
+        "FRONT_PAGE": 0,
+        "TOP_STORY": 1,
+        "IMPORTANT": 2,
+        "STANDARD": 3,
+        "IGNORE": 4,
+    }
+
+    decision_index = decision_order.get(
+        decision,
+        len(decision_order),
+    )
+
     return (
         role_index,
+        decision_index,
         -_score(event),
     )
+
+
+MOBILE_AUDIO_TOP = 1
+MOBILE_AUDIO_SECTION_LIMIT = 23
+MOBILE_AUDIO_MIN_SCORE = 32.0
+MOBILE_AUDIO_MAX_PER_SECTION = 5
+MOBILE_AUDIO_MAX_PER_COUNTRY = 3
+
+
+
+def _mobile_audio_official_source_is_international(event):
+    """
+    Mobile/Audio-only relevance gate for official national-government
+    sources.
+
+    This deliberately uses the event headline plus direct summary
+    language rather than aggregated actors/affected_areas, because
+    clustered Event Model metadata may contain secondary/background
+    references that are not the subject of the actual story.
+    """
+    content = event.get("content") or {}
+    sources = {
+        str(source).strip().lower()
+        for source in (content.get("sources") or [])
+    }
+
+    official_sources = {"uk_gov", "canada_news"}
+
+    if not (sources & official_sources):
+        return True
+
+    headline = str(content.get("headline") or "").strip().lower()
+    summary = str(content.get("summary") or "").strip().lower()
+
+    if not headline:
+        return False
+
+    # Explicit foreign countries / territories / international actors.
+    external_entities = (
+        "united states", "u.s.", "us-", "uk-u.s", "uk us",
+        "scotland-massachusetts", "massachusetts",
+        "ukraine", "poland", "nepal", "china", "bangladesh",
+        "russia", "india", "france", "germany", "japan",
+        "israel", "palestine", "gaza", "iran", "australia",
+        "saudi arabia", "nato", "aukus", "iaea",
+        "european union", "e.u.", "brics", "g7", "g20",
+        "united nations",
+    )
+
+    if any(token in headline for token in external_entities):
+        return True
+
+    # Direct cross-border relationships/actions. These are intentionally
+    # restricted to concrete international cooperation rather than
+    # generic mentions of another country in background context.
+    direct_patterns = (
+        r"\bpartnership with\b",
+        r"\bagreement with\b",
+        r"\bcooperation with\b",
+        r"\bcooperation between\b",
+        r"\bdialogue\b.*\b(?:u\.s\.|us|united states|ukraine|china|poland|india)\b",
+        r"\bwith (?:the )?(?:u\.s\.|us|united states|ukraine|china|poland|india|bangladesh|nepal)\b",
+        r"\bto (?:the )?(?:u\.s\.|us|united states|ukraine|china|poland|india|bangladesh|nepal)\b",
+        r"\bin (?:ukraine|poland|nepal|china|bangladesh|india)\b",
+        r"\bon (?:the )?(?:canada-|uk-)?(?:u\.s\.|us)\b",
+    )
+
+    for pattern in direct_patterns:
+        if re.search(pattern, headline):
+            return True
+
+    # A narrow summary fallback for explicit cross-border actions.
+    # This is deliberately conservative so a background sentence such as
+    # "the U.S. is imposing tariffs on Canada" does not make a domestic
+    # Canadian tax announcement international.
+    direct_summary_patterns = (
+        r"\bgovernment-to-government agreement\b",
+        r"\bpartnership with (?:the )?(?:u\.s\.|us|united states|ukraine|poland|china|bangladesh|nepal)\b",
+        r"\bdefence partnerships in poland\b",
+        r"\bdeploy(?:s|ed)? .* to kathmandu\b",
+        r"\bcanada-ukraine\b",
+        r"\bcanada-poland\b",
+        r"\bcanada-bangladesh\b",
+        r"\buk-u\.s\.\b",
+        r"\buk-us\b",
+        r"\baukus\b.*\biaea\b",
+    )
+
+    for pattern in direct_summary_patterns:
+        if re.search(pattern, summary):
+            return True
+
+    return False
+
+
+def _build_mobile_audio_selection(
+    events: list[dict],
+    event_memory=None,
+    publication_date=None,
+    edition_time=None,
+) -> dict:
+    """
+    Build the broad Mobile/Audio feed from the common Edition Model.
+
+    Rules:
+    - adaptive number of stories based on the actual news flow
+    - score threshold >= 32
+    - exclude explicitly unconfirmed events
+    - exclude obvious bulletin/roundup/meta headlines
+    - prioritize new events and developments
+    - prioritize events published since the previous scheduled release
+      while allowing materially important older developments to remain eligible
+    - use section/country diversity as a soft preference
+    - never force the edition to a fixed story count
+    """
+
+    generic_regions = {
+        "global", "world", "europe", "asia", "africa", "americas",
+        "north_america", "south_america", "middle_east",
+        "central_asia", "southeast_asia", "east_asia", "south_asia",
+    }
+
+    country_names = {
+        "afghanistan", "albania", "algeria", "angola", "argentina", "armenia",
+        "australia", "austria", "azerbaijan", "bahrain", "bangladesh",
+        "belarus", "belgium", "belize", "benin", "bhutan", "bolivia",
+        "bosnia_and_herzegovina", "botswana", "brazil", "brunei",
+        "bulgaria", "burkina_faso", "burundi", "cambodia", "cameroon",
+        "canada", "chad", "chile", "china", "colombia", "comoros",
+        "congo", "costa_rica", "croatia", "cuba", "cyprus", "czechia",
+        "denmark", "djibouti", "dominican_republic", "ecuador", "egypt",
+        "el_salvador", "eritrea", "estonia", "ethiopia", "finland",
+        "france", "gabon", "gambia", "georgia", "germany", "ghana",
+        "greece", "guatemala", "guinea", "guyana", "haiti", "honduras",
+        "hungary", "iceland", "india", "indonesia", "iran", "iraq",
+        "ireland", "israel", "italy", "ivory_coast", "jamaica", "japan",
+        "jordan", "kazakhstan", "kenya", "kuwait", "kyrgyzstan", "laos",
+        "latvia", "lebanon", "lesotho", "liberia", "libya", "lithuania",
+        "luxembourg", "madagascar", "malawi", "malaysia", "maldives",
+        "mali", "malta", "mauritania", "mauritius", "mexico", "moldova",
+        "mongolia", "montenegro", "morocco", "mozambique", "myanmar",
+        "namibia", "nepal", "netherlands", "new_zealand", "nicaragua",
+        "niger", "nigeria", "north_korea", "north_macedonia", "norway",
+        "oman", "pakistan", "panama", "paraguay", "peru", "philippines",
+        "poland", "portugal", "qatar", "romania", "russia", "rwanda",
+        "saudi_arabia", "senegal", "serbia", "singapore", "slovakia",
+        "slovenia", "somalia", "south_africa", "south_korea", "south_sudan",
+        "spain", "sri_lanka", "sudan", "sweden", "switzerland", "syria",
+        "taiwan", "tajikistan", "tanzania", "thailand", "togo", "tunisia",
+        "turkey", "turkmenistan", "uganda", "ukraine",
+        "united_arab_emirates", "united_kingdom", "united_states",
+        "uruguay", "uzbekistan", "venezuela", "vietnam", "yemen",
+        "zambia", "zimbabwe", "palestine", "kosovo",
+    }
+
+    topic_groups = {
+        "conflict": {
+            "military_conflict", "military", "attack", "drone_attack",
+            "missile_strike", "bombing", "explosion", "casualty",
+            "terrorism", "security",
+        },
+        "politics": {
+            "political", "diplomatic", "election", "government",
+            "policy", "leadership",
+        },
+        "economy": {
+            "economic", "business", "investment", "funding", "finance",
+            "trade",
+        },
+        "energy": {"energy", "oil", "gas", "electricity"},
+        "technology": {
+            "technology", "cyber", "ai", "artificial_intelligence", "space",
+        },
+        "health": {
+            "health", "disease", "pandemic", "outbreak", "medical",
+        },
+        "climate": {
+            "climate", "flood", "earthquake", "wildfire",
+            "natural_disaster", "disaster",
+        },
+        "society": {
+            "humanitarian", "education", "migration", "society",
+            "culture", "protest",
+        },
+        "sports": {"sports"},
+    }
+
+    roundup_re = re.compile(
+        r"\b("
+        r"latest\s+news\s+bulletin|news\s+bulletin|"
+        r"daily\s+roundup|morning\s+roundup|evening\s+roundup|"
+        r"morning\s+briefing|evening\s+briefing|"
+        r"news\s+roundup|what\s+you\s+need\s+to\s+know|"
+        r"explainer|explained|"
+        r"why\s+it\s+matters|"
+        r"history\s+of|"
+        r"connection\s+to|"
+        r"what\s+is|"
+        r"how\s+it\s+works"
+        r")\b",
+        re.IGNORECASE,
+    )
+
+    def text_of(event):
+        content = event.get("content") or {}
+        return str(
+            content.get("headline")
+            or event.get("headline")
+            or event.get("title")
+            or ""
+        ).strip()
+
+    def section_of(event):
+        content = event.get("content") or {}
+        return str(
+            content.get("section")
+            or event.get("section")
+            or "world"
+        ).strip().lower() or "world"
+
+    def locations_of(event):
+        content = event.get("content") or {}
+        values = list(content.get("affected_areas") or [])
+
+        for article in event.get("articles") or []:
+            values.extend(article.get("locations") or [])
+
+        values.extend(event.get("locations") or [])
+
+        result = set()
+
+        for value in values:
+            token = (
+                str(value).strip().lower()
+                .replace("-", "_")
+                .replace(" ", "_")
+            )
+
+            if token and token not in generic_regions:
+                result.add(token)
+
+        return result
+
+    country_headline_aliases = {
+        "american": "united_states",
+        "british": "united_kingdom",
+        "canadian": "canada",
+        "chinese": "china",
+        "french": "france",
+        "german": "germany",
+        "greek": "greece",
+        "indian": "india",
+        "indonesian": "indonesia",
+        "iranian": "iran",
+        "iraqi": "iraq",
+        "israeli": "israel",
+        "italian": "italy",
+        "japanese": "japan",
+        "kenyan": "kenya",
+        "lebanese": "lebanon",
+        "libyan": "libya",
+        "malaysian": "malaysia",
+        "moldovan": "moldova",
+        "nepali": "nepal",
+        "nigerian": "nigeria",
+        "norwegian": "norway",
+        "pakistani": "pakistan",
+        "polish": "poland",
+        "portuguese": "portugal",
+        "qatari": "qatar",
+        "russian": "russia",
+        "saudi": "saudi_arabia",
+        "senegalese": "senegal",
+        "serbian": "serbia",
+        "south_korean": "south_korea",
+        "spanish": "spain",
+        "sudanese": "sudan",
+        "syrian": "syria",
+        "taiwanese": "taiwan",
+        "thai": "thailand",
+        "turkish": "turkey",
+        "ukrainian": "ukraine",
+        "uzbek": "uzbekistan",
+        "vietnamese": "vietnam",
+        "yemeni": "yemen",
+        "zambian": "zambia",
+        "zimbabwean": "zimbabwe",
+        "malian": "mali",
+        "egyptian": "egypt",
+        "ethiopian": "ethiopia",
+        "ghanaian": "ghana",
+        "jordanian": "jordan",
+        "moroccan": "morocco",
+        "nepalese": "nepal",
+        "filipino": "philippines",
+        "philippine": "philippines",
+        "congolese": "democratic_republic_of_congo",
+    }
+
+    def countries_of(event):
+        countries = {
+            token
+            for token in locations_of(event)
+            if token in country_names
+        }
+
+        title = text_of(event).lower()
+
+        for country in country_names:
+            phrase = country.replace("_", " ")
+            if re.search(r"\b" + re.escape(phrase) + r"\b", title):
+                countries.add(country)
+
+        for alias, country in country_headline_aliases.items():
+            if re.search(r"\b" + re.escape(alias) + r"\b", title):
+                countries.add(country)
+
+        return countries
+
+    def topic_of(event):
+        # The Edition Model section is the primary editorial topic.
+        # Event types are used only as a fallback when the section is
+        # missing or too generic.
+        section = section_of(event)
+
+        section_map = {
+            "world": "world",
+            "geopolitics": "politics",
+            "business": "economy",
+            "energy": "energy",
+            "technology": "technology",
+            "science_health": "health",
+            "climate": "climate",
+            "trade_logistics": "economy",
+            "society": "society",
+            "culture": "society",
+            "sports": "sports",
+        }
+
+        mapped_section = section_map.get(section)
+
+        if mapped_section and mapped_section != "world":
+            return mapped_section
+
+        content = event.get("content") or {}
+        values = list(content.get("event_types") or [])
+
+        for article in event.get("articles") or []:
+            values.extend(article.get("event_types") or [])
+
+        event_types = {
+            str(value).strip().lower()
+            .replace("-", "_")
+            .replace(" ", "_")
+            for value in values
+        }
+
+        # Ordered fallback: choose the broadest meaningful topic.
+        for family in (
+            "conflict",
+            "politics",
+            "economy",
+            "energy",
+            "technology",
+            "health",
+            "climate",
+            "society",
+            "sports",
+        ):
+            if event_types & topic_groups[family]:
+                return family
+
+        return "world"
+
+    def event_key(event):
+        urls = sorted(
+            str(article.get("url") or "").strip()
+            for article in event.get("articles") or []
+            if article.get("url")
+        )
+
+        if urls:
+            return urls[0]
+
+        return re.sub(r"\s+", " ", text_of(event)).lower()[:240]
+
+    current_release = None
+    previous_release = None
+
+    if publication_date and edition_time:
+        try:
+            current_release = datetime.fromisoformat(
+                f"{publication_date}T{edition_time}"
+            ).replace(
+                tzinfo=ZoneInfo(DEFAULT_TIMEZONE)
+            )
+            previous_release = _previous_release_datetime(
+                publication_date,
+                edition_time,
+            )
+        except (TypeError, ValueError):
+            current_release = None
+            previous_release = None
+
+    def latest_published_datetime(event):
+        dates = []
+
+        for article in event.get("articles") or []:
+            value = article.get("published_at")
+
+            if not value:
+                continue
+
+            if isinstance(value, datetime):
+                dt = value
+            else:
+                text = str(value).strip()
+
+                if text.endswith("Z"):
+                    text = text[:-1] + "+00:00"
+
+                try:
+                    dt = datetime.fromisoformat(text)
+                except ValueError:
+                    continue
+
+            if dt.tzinfo is None:
+                dt = dt.replace(
+                    tzinfo=ZoneInfo(DEFAULT_TIMEZONE)
+                )
+
+            else:
+                dt = dt.astimezone(
+                    ZoneInfo(DEFAULT_TIMEZONE)
+                )
+
+            dates.append(dt)
+
+        if not dates:
+            return None
+
+        return max(dates)
+
+    def event_is_in_release_window(event):
+        if current_release is None or previous_release is None:
+            return False
+
+        latest = latest_published_datetime(event)
+
+        if latest is None:
+            return False
+
+        return (
+            previous_release
+            <= latest
+            <= current_release
+        )
+
+    candidates = []
+
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+
+        # Official national-government feeds require a genuine
+        # international/trans-border signal for Mobile/Audio.
+        #
+        # This gate is intentionally local to Mobile/Audio. The common
+        # editorial/ranking model and Full Edition remain unchanged.
+        if not _mobile_audio_official_source_is_international(event):
+            continue
+
+        if _score(event) < MOBILE_AUDIO_MIN_SCORE:
+            continue
+
+        verification = (
+            event.get("verification") or {}
+        ).get("verification_level", "")
+
+        if str(verification).upper() == "UNCONFIRMED":
+            continue
+
+        title = text_of(event)
+
+        if not title:
+            continue
+
+        if roundup_re.search(title):
+            continue
+
+        # Do not republish the exact same event fingerprint once it
+        # has already appeared in an earlier edition. A materially
+        # changed event normally receives a new fingerprint.
+        if event_memory is not None:
+            try:
+                if event_memory.edition_history(event):
+                    continue
+            except Exception:
+                pass
+
+        candidates.append(event)
+
+    candidates.sort(
+        key=lambda event: (
+            _score(event),
+            (event.get("content") or {}).get("freshness_score", 0),
+        ),
+        reverse=True,
+    )
+
+    selected = []
+    selected_keys = set()
+    country_topic_seen = set()
+    section_counts = {}
+    country_counts = {}
+
+    def diversity_value(event):
+        section = section_of(event)
+        countries = countries_of(event)
+
+        value = _score(event)
+
+        # Release-window priority:
+        # new information since the previous scheduled release
+        # is preferred, but older high-value events remain eligible.
+        if event_is_in_release_window(event):
+            value += 10.0
+
+        # Freshness is already represented by the Edition Model
+        # ranking. Release-window priority above is the additional
+        # signal used by Mobile + Audio selection.
+
+        # Diversity remains a preference, not a hard filter.
+        if section not in section_counts:
+            value += 7.0
+        elif section_counts[section] < MOBILE_AUDIO_MAX_PER_SECTION:
+            value += 1.5
+        else:
+            value -= 3.0
+
+        if section == "geopolitics":
+            geo_count = section_counts.get("geopolitics", 0)
+
+            if geo_count >= 8:
+                value -= 4.0
+
+        if countries:
+            if any(
+                country not in country_counts
+                for country in countries
+            ):
+                value += 4.0
+            else:
+                value -= 1.0
+
+            if any(
+                country_counts.get(country, 0) >= MOBILE_AUDIO_MAX_PER_COUNTRY
+                for country in countries
+            ):
+                value -= 1.5
+
+        return value
+
+    while True:
+        available = []
+
+        for event in candidates:
+            key = event_key(event)
+
+            if key in selected_keys:
+                continue
+
+            countries = countries_of(event)
+            topic = topic_of(event)
+
+            # Country/topic diversity is intentionally soft. Do not
+            # suppress an otherwise qualifying important event.
+            available.append(event)
+
+        if not available:
+            break
+
+        best = max(available, key=diversity_value)
+
+        selected.append(best)
+        selected_keys.add(event_key(best))
+
+        section = section_of(best)
+        section_counts[section] = section_counts.get(section, 0) + 1
+
+        countries = countries_of(best)
+        topic = topic_of(best)
+
+        for country in countries:
+            country_counts[country] = country_counts.get(country, 0) + 1
+            country_topic_seen.add((country, topic))
+
+    top_story = selected[0] if selected else None
+
+    main_end = min(
+        len(selected),
+        MOBILE_AUDIO_TOP + MOBILE_AUDIO_SECTION_LIMIT,
+    )
+
+    return {
+        "top_story": top_story,
+        "main_stories": selected[MOBILE_AUDIO_TOP:main_end],
+        "briefs": selected[main_end:],
+        "events": selected,
+        "event_count": len(selected),
+        "candidate_count": len(candidates),
+    }
 
 
 def build_edition(
     events: Any,
     publication_date=None,
     edition_time=None,
+    *,
+    event_memory=None,
+    exclude_ignored: bool = False,
 ) -> dict:
     """
     Build one deterministic edition structure.
@@ -177,6 +880,15 @@ def build_edition(
         for event in events
         if isinstance(event, dict)
         and _is_publishable(event)
+        and not (
+            exclude_ignored
+            and str(
+                _editorial(event).get(
+                    "decision",
+                    "",
+                )
+            ).strip().upper() == "IGNORE"
+        )
     ]
 
     ordered = sorted(
@@ -191,9 +903,14 @@ def build_edition(
     for event in ordered:
         role = _role(event)
 
-        if role == "TOP_STORY" and top_story is None:
+        if role == "LEAD_STORY" and top_story is None:
             top_story = event
-        elif role == "MAIN_STORY":
+        elif role == "TOP_STORY" and top_story is None:
+            top_story = event
+        elif role in {
+            "SECTION_STORY",
+            "MAIN_STORY",
+        }:
             main_stories.append(event)
         else:
             briefs.append(event)
@@ -211,13 +928,22 @@ def build_edition(
             [],
         ).append(event)
 
+    mobile_audio = _build_mobile_audio_selection(
+        ordered,
+        event_memory=event_memory,
+        publication_date=publication_date,
+        edition_time=edition_time,
+    )
+
     result = {
         "edition_type": "WORLD_PULSE",
         "event_count": len(ordered),
+        "ordered": ordered,
         "top_story": top_story,
         "main_stories": main_stories,
         "briefs": briefs,
         "sections": sections,
+        "mobile_audio": mobile_audio,
     }
 
     if publication_date is not None and edition_time is not None:

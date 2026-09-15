@@ -25,7 +25,7 @@ class MockPublisher:
 
 def edition():
     return {
-        "edition_id": "WORLD-PULSE-EN-2026-08-30-1300",
+        "edition_id": "AROUND-THE-MAIN-EN-2026-08-30-1300",
         "edition_type": "WORLD_PULSE",
         "event_count": 1,
         "top_story": {
@@ -45,19 +45,25 @@ def edition():
     }
 
 
-def test_publish_edition_builds_package_and_delivers():
+def test_publish_edition_builds_package_and_delivers(tmp_path):
+    from tests.conftest import create_approved_manifest
     publisher = MockPublisher()
     log = SQLiteEditionDeliveryLog(":memory:")
+    approval_manifest = create_approved_manifest(
+        tmp_path,
+        edition()["edition_id"],
+    )
 
     result = publish_edition(
         edition(),
         log=log,
         publisher=publisher,
+        approval_manifest_path=approval_manifest,
     )
 
     assert result["status"] == COMPLETED
     assert result["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
 
     assert result["publication"]["telegram"]["text"]
@@ -68,26 +74,52 @@ def test_publish_edition_builds_package_and_delivers():
     log.close()
 
 
-def test_publish_edition_is_idempotent():
+def test_publish_edition_is_idempotent(tmp_path):
+    from tests.conftest import create_approved_manifest
     publisher = MockPublisher()
     log = SQLiteEditionDeliveryLog(":memory:")
+    approval_manifest = create_approved_manifest(
+        tmp_path,
+        edition()["edition_id"],
+    )
 
     first = publish_edition(
         edition(),
         log=log,
         publisher=publisher,
+        approval_manifest_path=approval_manifest,
     )
 
     second = publish_edition(
         edition(),
         log=log,
         publisher=publisher,
+        approval_manifest_path=approval_manifest,
     )
 
     assert first["status"] == COMPLETED
     assert second["status"] == "SKIPPED"
 
     assert len(publisher.published) == 1
+
+    log.close()
+
+
+
+def test_publish_edition_is_blocked_without_approval():
+    publisher = MockPublisher()
+    log = SQLiteEditionDeliveryLog(":memory:")
+
+    result = publish_edition(
+        edition(),
+        log=log,
+        publisher=publisher,
+    )
+
+    assert result["status"] == FAILED
+    assert result["reason"] == "APPROVAL_NOT_APPROVED"
+    assert result["approval_status"] is None
+    assert publisher.published == []
 
     log.close()
 
@@ -99,7 +131,8 @@ def test_invalid_edition_is_rejected():
     assert result["reason"] == "INVALID_EDITION"
 
 
-def test_original_edition_is_not_modified():
+def test_original_edition_is_not_modified(tmp_path):
+    from tests.conftest import create_approved_manifest
     item = edition()
 
     before = {
@@ -112,11 +145,16 @@ def test_original_edition_is_not_modified():
 
     publisher = MockPublisher()
     log = SQLiteEditionDeliveryLog(":memory:")
+    approval_manifest = create_approved_manifest(
+        tmp_path,
+        item["edition_id"],
+    )
 
     publish_edition(
         item,
         log=log,
         publisher=publisher,
+        approval_manifest_path=approval_manifest,
     )
 
     assert item["edition_id"] == before["edition_id"]
@@ -128,7 +166,8 @@ def test_original_edition_is_not_modified():
     log.close()
 
 
-def test_failed_delivery_does_not_report_completed():
+def test_failed_delivery_does_not_report_completed(tmp_path):
+    from tests.conftest import create_approved_manifest
     class FailedPublisher:
         def publish(self, event):
             return {
@@ -138,11 +177,16 @@ def test_failed_delivery_does_not_report_completed():
             }
 
     log = SQLiteEditionDeliveryLog(":memory:")
+    approval_manifest = create_approved_manifest(
+        tmp_path,
+        edition()["edition_id"],
+    )
 
     result = publish_edition(
         edition(),
         log=log,
         publisher=FailedPublisher(),
+        approval_manifest_path=approval_manifest,
     )
 
     assert result["status"] == "FAILED"

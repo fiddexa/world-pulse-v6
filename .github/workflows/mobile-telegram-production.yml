@@ -1,0 +1,155 @@
+name: AROUND THE MAIN - Mobile Telegram Production
+
+on:
+  schedule:
+    - cron: "7 7 * * *"
+      timezone: "America/New_York"
+    - cron: "7 13 * * *"
+      timezone: "America/New_York"
+    - cron: "7 20 * * *"
+      timezone: "America/New_York"
+  workflow_dispatch:
+
+concurrency:
+  group: around-the-main-mobile-production
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    env:
+      TZ: America/New_York
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+    steps:
+      - name: Checkout production code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Restore production state
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf /tmp/around-the-main-production-state
+          mkdir -p /tmp/around-the-main-production-state
+
+          git clone \
+            --branch production-state \
+            --single-branch \
+            --depth 1 \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            /tmp/around-the-main-production-state
+
+          mkdir -p data data/editions
+
+          for file in \
+            edition_counter.json \
+            edition_delivery.sqlite3 \
+            edition_memory.sqlite3 \
+            event_memory.sqlite3
+          do
+            if [ -f "/tmp/around-the-main-production-state/data/$file" ]; then
+              cp \
+                "/tmp/around-the-main-production-state/data/$file" \
+                "data/$file"
+            fi
+          done
+
+          if [ -d "/tmp/around-the-main-production-state/data/editions" ]; then
+            cp -a \
+              /tmp/around-the-main-production-state/data/editions/. \
+              data/editions/
+          fi
+
+      - name: Run Mobile Telegram release
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          from pipeline.mobile_telegram_production import (
+              run_mobile_telegram_release,
+          )
+
+          result = run_mobile_telegram_release(
+              dry_run=False,
+          )
+
+          print("RELEASE RESULT:")
+          print(result)
+
+          status = result.get("status")
+
+          if status in {"SENT", "SKIPPED"}:
+              raise SystemExit(0)
+
+          raise SystemExit(
+              f"Production release failed with status: {status}"
+          )
+          PY
+
+      - name: Save production state
+        if: steps.release.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          STATE=/tmp/around-the-main-production-state
+
+          mkdir -p "$STATE/data" "$STATE/data/editions"
+
+          for file in \
+            edition_counter.json \
+            edition_delivery.sqlite3 \
+            edition_memory.sqlite3 \
+            event_memory.sqlite3
+          do
+            if [ -f "data/$file" ]; then
+              cp "data/$file" "$STATE/data/$file"
+            fi
+          done
+
+          rm -rf "$STATE/data/editions"
+          mkdir -p "$STATE/data/editions"
+
+          if [ -d "data/editions" ]; then
+            cp -a \
+              data/editions/. \
+              "$STATE/data/editions/"
+          fi
+
+          git -C "$STATE" config user.name "github-actions[bot]"
+          git -C "$STATE" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git -C "$STATE" add -A
+
+          if git -C "$STATE" diff --cached --quiet; then
+            echo "No production-state changes."
+            exit 0
+          fi
+
+          git -C "$STATE" commit \
+            -m "Update production state"
+
+          git -C "$STATE" push \
+            origin \
+            production-state

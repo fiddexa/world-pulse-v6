@@ -1,8 +1,8 @@
 """
-WORLD PULSE v6 - Production Delivery
+AROUND THE MAIN v6 - Production Delivery
 
 Explicit production entry point for publishing an already-built
-WORLD PULSE edition.
+AROUND THE MAIN edition.
 
 This layer does not schedule, collect news, or rebuild an edition.
 It only connects an existing edition to edition-level publication
@@ -19,6 +19,7 @@ def deliver_production_edition(
     *,
     log=None,
     publisher=None,
+    approval_manifest_path=None,
 ) -> dict:
     """
     Publish one already-built production edition.
@@ -35,6 +36,7 @@ def deliver_production_edition(
         edition,
         log=log,
         publisher=publisher,
+        approval_manifest_path=approval_manifest_path,
     )
 
     return {

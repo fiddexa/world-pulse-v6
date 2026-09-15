@@ -21,7 +21,7 @@ def test_before_first_slot_uses_previous_day_evening():
         "edition_date": "2026-08-29",
         "edition_time": "20:00",
         "edition_id": (
-            "WORLD-PULSE-EN-2026-08-29-2000"
+            "AROUND-THE-MAIN-EN-2026-08-29-2000"
         ),
     }
 
@@ -40,7 +40,7 @@ def test_first_slot_starts_at_0700():
     assert result["edition_date"] == "2026-08-30"
     assert result["edition_time"] == "07:00"
     assert result["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-0700"
+        "AROUND-THE-MAIN-EN-2026-08-30-0700"
     )
 
 
@@ -71,7 +71,7 @@ def test_afternoon_slot_starts_at_1300():
 
     assert result["edition_time"] == "13:00"
     assert result["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-1300"
+        "AROUND-THE-MAIN-EN-2026-08-30-1300"
     )
 
 
@@ -102,7 +102,7 @@ def test_evening_slot_starts_at_2000():
 
     assert result["edition_time"] == "20:00"
     assert result["edition_id"] == (
-        "WORLD-PULSE-EN-2026-08-30-2000"
+        "AROUND-THE-MAIN-EN-2026-08-30-2000"
     )
 
 
@@ -150,7 +150,7 @@ def test_custom_language_is_used():
     )
 
     assert result["edition_id"] == (
-        "WORLD-PULSE-FR-2026-08-30-1300"
+        "AROUND-THE-MAIN-FR-2026-08-30-1300"
     )
 
 

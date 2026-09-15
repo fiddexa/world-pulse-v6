@@ -1,5 +1,5 @@
 """
-WORLD PULSE v6 - Production Orchestrator
+AROUND THE MAIN v6 - Production Orchestrator
 
 Connects the prepared publication pipeline with delivery execution.
 

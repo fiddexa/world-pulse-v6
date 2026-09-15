@@ -1,8 +1,8 @@
 # =========================================================
-# WORLD PULSE v6 — CONFIGURATION
+# AROUND THE MAIN v6 — CONFIGURATION
 # =========================================================
 
-APP_NAME = "WORLD PULSE"
+APP_NAME = "AROUND THE MAIN"
 VERSION = "6.0"
 
 # ---------------------------------------------------------
