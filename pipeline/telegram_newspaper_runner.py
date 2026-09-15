@@ -262,15 +262,9 @@ def publish_edition_newspaper_to_telegram(
     total = len(pages)
 
     for index, page in enumerate(pages, start=1):
+        # Telegram publication is image-only.
+        # No caption/text block is attached below the newspaper page.
         caption = ""
-        if index == 1:
-            if number is not None:
-                caption = (
-                    f"AROUND THE MAIN — EDITION {number:04d}\n"
-                    "Newspaper Edition"
-                )
-            else:
-                caption = "AROUND THE MAIN\nNewspaper Edition"
 
         response = transport(
             chat_id=chat_id,

@@ -28,9 +28,13 @@ from pipeline.edition_memory import (
     RUNNING,
     EditionMemory,
 )
+from pipeline.production_retention import (
+    cleanup_production_state,
+)
 from pipeline.edition_preview import approve_edition_preview
 from pipeline.edition_slot_resolver import resolve_edition_slot
 from pipeline.mobile_renderer import render_mobile_edition
+from pipeline.market_data import fetch_market_snapshot
 from pipeline.production_job import run_production_job
 from pipeline.telegram_newspaper_runner import (
     _telegram_send_photo,
@@ -420,6 +424,29 @@ def run_mobile_telegram_release(
             production["edition_label"]
         )
 
+        market_snapshot = fetch_market_snapshot(
+            timeout=15,
+        )
+
+        edition["market_snapshot"] = (
+            market_snapshot
+        )
+
+        print(
+            "MARKET SNAPSHOT:",
+            market_snapshot.get("provider"),
+        )
+        print(
+            "MARKET FETCHED AT:",
+            market_snapshot.get("fetched_at"),
+        )
+        print(
+            "MARKET QUOTES:",
+            len(
+                market_snapshot.get("quotes") or {}
+            ),
+        )
+
         archive_path = _save_edition(
             edition
         )
@@ -549,6 +576,13 @@ def run_mobile_telegram_release(
         transport=_retry_photo_transport,
         chat_id=chat_id,
     )
+
+    if delivery.get("status") == "SENT":
+        retention = cleanup_production_state()
+        print(
+            "PRODUCTION RETENTION:",
+            retention,
+        )
 
     return {
         "status": delivery.get(

@@ -54,10 +54,7 @@ def test_newspaper_delivery_sends_all_pages_and_records_sent(tmp_path):
     assert result["message_ids"] == [101, 102, 103]
     assert len(calls) == 3
     assert calls[0][0] == "@aroundthemain"
-    assert calls[0][2] == (
-        "AROUND THE MAIN — EDITION 0122\n"
-        "Newspaper Edition"
-    )
+    assert calls[0][2] == ""
     assert calls[1][2] == ""
     assert log.has_been_sent(
         {"edition_id": edition_id},
