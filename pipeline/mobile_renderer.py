@@ -269,19 +269,10 @@ def _draw_last_page_branding(
     available_bottom: int,
 ) -> dict:
     """
-    Fill the final-page free area aesthetically.
+    Draw the final-page information block without decorative branding.
 
-    The INFO block is always the same element:
-    same text, same typography, same spacing.
-
-    Banner selection is based on the actual available vertical space.
-    Six banner sizes are tested from largest to smallest.
-
-    Rules:
-    - <25% free space: INFO only
-    - >=25%: choose the largest banner that fully fits with INFO
-    - if no banner fits: INFO only
-    - if complete INFO does not fit: nothing
+    The decorative LAST_PAGE_LOGO banner is intentionally disabled.
+    INFORMATION & RIGHTS remains unchanged.
     """
 
     free_height = max(
@@ -303,10 +294,6 @@ def _draw_last_page_branding(
         - MARGIN * 2
     )
 
-    # -------------------------------------------------------------
-    # INFO is the absolute minimum usable block.
-    # -------------------------------------------------------------
-
     info_metrics = _last_page_info_metrics(
         draw,
         content_width,
@@ -322,209 +309,26 @@ def _draw_last_page_branding(
             "info_height": info_height,
         }
 
-    free_ratio = (
-        free_height
-        / MOBILE_PAGE_HEIGHT
-    )
-
-    # -------------------------------------------------------------
-    # Below 25%: never force a banner.
-    # -------------------------------------------------------------
-
-    if free_ratio < 0.25:
-        info_top = (
-            last_content_bottom
-            + LAST_PAGE_BLOCK_GAP
-        )
-
-        info_bottom = _draw_last_page_info(
-            canvas,
-            draw,
-            top=info_top,
-            width=content_width,
-        )
-
-        return {
-            "drawn": info_bottom is not None,
-            "variant": "INFO_ONLY",
-            "free_height": free_height,
-            "info_height": info_height,
-            "banner": False,
-            "bottom": info_bottom,
-        }
-
-    # -------------------------------------------------------------
-    # Six banner sizes.
-    #
-    # The source asset is 3:1, so height is derived from width.
-    # Test largest -> smallest and use the first one that fully fits.
-    # -------------------------------------------------------------
-
-    banner_sizes = [
-        ("SIZE_06", 810),
-        ("SIZE_05", 720),
-        ("SIZE_04", 630),
-        ("SIZE_03", 540),
-        ("SIZE_02", 450),
-        ("SIZE_01", 360),
-    ]
-
-    chosen = None
-
-    try:
-        with Image.open(
-            LAST_PAGE_LOGO
-        ) as source:
-            logo_source = source.convert("RGBA")
-
-        source_ratio = (
-            logo_source.height
-            / logo_source.width
-        )
-
-        for variant, logo_width in banner_sizes:
-            logo_width = min(
-                logo_width,
-                content_width,
-            )
-
-            logo_height = int(
-                logo_width
-                * source_ratio
-            )
-
-            required_height = (
-                logo_height
-                + LAST_PAGE_BLOCK_GAP
-                + info_height
-            )
-
-            if required_height <= free_height:
-                chosen = (
-                    variant,
-                    logo_width,
-                    logo_height,
-                )
-                break
-
-    except Exception as exc:
-        print(
-            "[WARN] Last-page banner load failed:",
-            exc,
-        )
-
-    # -------------------------------------------------------------
-    # No banner fits: draw the same INFO block only.
-    # -------------------------------------------------------------
-
-    if chosen is None:
-        info_top = (
-            last_content_bottom
-            + LAST_PAGE_BLOCK_GAP
-        )
-
-        info_bottom = _draw_last_page_info(
-            canvas,
-            draw,
-            top=info_top,
-            width=content_width,
-        )
-
-        return {
-            "drawn": info_bottom is not None,
-            "variant": "INFO_ONLY",
-            "free_height": free_height,
-            "info_height": info_height,
-            "banner": False,
-            "bottom": info_bottom,
-        }
-
-    variant, logo_width, logo_height = chosen
-
-    cursor = (
+    info_top = (
         last_content_bottom
         + LAST_PAGE_BLOCK_GAP
     )
 
-    # -------------------------------------------------------------
-    # Draw selected banner.
-    # -------------------------------------------------------------
-
-    try:
-        logo = logo_source.resize(
-            (
-                logo_width,
-                logo_height,
-            ),
-            Image.Resampling.LANCZOS,
-        )
-
-        logo_x = (
-            MARGIN
-            + (
-                content_width
-                - logo.width
-            ) // 2
-        )
-
-        canvas.paste(
-            logo,
-            (
-                logo_x,
-                cursor,
-            ),
-            logo,
-        )
-
-        cursor += (
-            logo.height
-            + LAST_PAGE_BLOCK_GAP
-        )
-
-    except Exception as exc:
-        print(
-            "[WARN] Last-page banner render failed:",
-            exc,
-        )
-
-        variant = "INFO_ONLY"
-
-        cursor = (
-            last_content_bottom
-            + LAST_PAGE_BLOCK_GAP
-        )
-
-    # -------------------------------------------------------------
-    # Draw the SAME INFO block as in the INFO-only case.
-    # -------------------------------------------------------------
-
     info_bottom = _draw_last_page_info(
         canvas,
         draw,
-        top=cursor,
+        top=info_top,
         width=content_width,
     )
 
-    if info_bottom is None:
-        return {
-            "drawn": False,
-            "variant": "NONE",
-            "free_height": free_height,
-            "info_height": info_height,
-            "banner": False,
-        }
-
     return {
-        "drawn": True,
-        "variant": variant,
+        "drawn": info_bottom is not None,
+        "variant": "INFO_ONLY",
         "free_height": free_height,
         "info_height": info_height,
-        "banner": True,
-        "banner_width": logo_width,
-        "banner_height": logo_height,
+        "banner": False,
         "bottom": info_bottom,
     }
-
 
 def _list(value: Any) -> list:
     if isinstance(value, list):
