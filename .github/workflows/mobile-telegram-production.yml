@@ -2,11 +2,7 @@ name: AROUND THE MAIN - Mobile Telegram Production
 
 on:
   schedule:
-    - cron: "7 7 * * *"
-      timezone: "America/New_York"
-    - cron: "7 13 * * *"
-      timezone: "America/New_York"
-    - cron: "7 20 * * *"
+    - cron: "*/10 * * * *"
       timezone: "America/New_York"
   workflow_dispatch:
 
@@ -88,10 +84,10 @@ jobs:
 
           python - <<'PY'
           from pipeline.mobile_telegram_production import (
-              run_mobile_telegram_release,
+              run_mobile_telegram_watchdog,
           )
 
-          result = run_mobile_telegram_release(
+          result = run_mobile_telegram_watchdog(
               dry_run=False,
           )
 
@@ -100,7 +96,7 @@ jobs:
 
           status = result.get("status")
 
-          if status in {"SENT", "SKIPPED"}:
+          if status in {"COMPLETED", "SENT", "SKIPPED"}:
               raise SystemExit(0)
 
           raise SystemExit(
