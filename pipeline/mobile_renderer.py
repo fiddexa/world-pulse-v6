@@ -1341,10 +1341,13 @@ def render_mobile_edition(
     # MARKETS TODAY while allowing additional compact stories.
     content_bottom_first = 930
 
+    # PAGE 02+ uses the actual rendered footer geometry.
+    # footer-pages.png renders to 24 px at WIDTH=900.
+    # Keep the same safety gap used by last-page branding.
     content_bottom_other = (
         MOBILE_PAGE_HEIGHT
-        - red_bar_height
-        - MARGIN
+        - 24
+        - LAST_PAGE_FOOTER_GAP
     )
 
     available_first = (
@@ -1463,9 +1466,12 @@ def render_mobile_edition(
                         (0, 0),
                     )
 
-                    # MORNING BRIEFING — placed in the open space
+                    # Edition-specific title in the open space
                     # between the interrupted top lines of the header.
-                    briefing = "MORNING BRIEFING"
+                    briefing = _edition_name(edition)
+
+                    if not briefing:
+                        briefing = "AROUND THE MAIN"
 
                     briefing_bbox = draw.textbbox(
                         (0, 0),
