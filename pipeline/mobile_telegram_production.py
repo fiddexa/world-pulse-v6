@@ -51,7 +51,7 @@ MOBILE_OUTPUT_ROOT = DATA_ROOT / "newspaper"
 APPROVAL_ROOT = DATA_ROOT / "previews" / "mobile-production"
 
 POLL_SECONDS = 30
-MAX_CATCHUP_HOURS = 4
+MAX_CATCHUP_HOURS = 12
 
 TELEGRAM_TOKEN_ENV = "TELEGRAM_BOT_TOKEN"
 TELEGRAM_CHAT_ENV = "TELEGRAM_CHAT_ID"
@@ -77,6 +77,70 @@ def _edition_slot_datetime(resolved: dict) -> datetime:
     return datetime.fromisoformat(
         f'{resolved["edition_date"]}T{resolved["edition_time"]}'
     ).replace(tzinfo=TIMEZONE)
+
+
+def get_due_edition_slots(
+    current_time: datetime,
+    *,
+    language: str = "en",
+) -> list[dict]:
+    """
+    Return publication slots that are already due.
+
+    The watchdog considers the current day and, before the first
+    daily slot, the previous day's final slot. Future slots are
+    excluded. Results are returned in chronological order.
+    """
+    from datetime import timedelta
+
+    current_time = current_time.astimezone(TIMEZONE)
+
+    slot_times = (
+        "07:00",
+        "13:00",
+        "20:00",
+    )
+
+    candidates = []
+
+    for slot_time in slot_times:
+        slot_datetime = datetime.fromisoformat(
+            f"{current_time.date()}T{slot_time}"
+        ).replace(tzinfo=TIMEZONE)
+
+        if slot_datetime <= current_time:
+            resolved = resolve_edition_slot(
+                slot_datetime,
+                language=language,
+            )
+            candidates.append(resolved)
+
+    if current_time.hour < 7:
+        previous_date = (
+            current_time.date() - timedelta(days=1)
+        )
+
+        resolved = resolve_edition_slot(
+            datetime.fromisoformat(
+                f"{previous_date}T20:00"
+            ).replace(tzinfo=TIMEZONE),
+            language=language,
+        )
+
+        candidates.insert(0, resolved)
+
+    unique = {}
+
+    for resolved in candidates:
+        unique[resolved["edition_id"]] = resolved
+
+    return sorted(
+        unique.values(),
+        key=lambda item: (
+            item["edition_date"],
+            item["edition_time"],
+        ),
+    )
 
 
 def _edition_json_path(edition_id: str) -> Path:
@@ -283,6 +347,7 @@ def _retry_photo_transport(
 def run_mobile_telegram_release(
     *,
     current_time: datetime | None = None,
+    resolved: dict | None = None,
     language: str = "en",
     timeout: int = 20,
     dry_run: bool = False,
@@ -300,10 +365,11 @@ def run_mobile_telegram_release(
         else _now()
     )
 
-    resolved = resolve_edition_slot(
-        current_time,
-        language=language,
-    )
+    if resolved is None:
+        resolved = resolve_edition_slot(
+            current_time,
+            language=language,
+        )
 
     edition_id = resolved["edition_id"]
 
@@ -595,6 +661,92 @@ def run_mobile_telegram_release(
         ),
         "page_count": len(pages),
         "delivery": delivery,
+    }
+
+
+def run_mobile_telegram_watchdog(
+    *,
+    current_time: datetime | None = None,
+    language: str = "en",
+    timeout: int = 20,
+    dry_run: bool = False,
+) -> dict:
+    """
+    Process every due publication slot in chronological order.
+
+    The watchdog never advances directly to only the latest slot.
+    It checks all due slots returned by get_due_edition_slots()
+    and processes them one by one.
+
+    A failed slot stops the current watchdog run so the next
+    invocation can retry it and preserve chronological catch-up.
+    """
+
+    current_time = (
+        current_time
+        if current_time is not None
+        else _now()
+    )
+
+    due_slots = get_due_edition_slots(
+        current_time,
+        language=language,
+    )
+
+    results = []
+    sent = 0
+    skipped = 0
+
+    for resolved in due_slots:
+        edition_id = resolved["edition_id"]
+
+        if newspaper_delivery_already_sent(
+            edition_id
+        ):
+            result = {
+                "status": "SKIPPED",
+                "edition_id": edition_id,
+                "reason": "ALREADY_SENT",
+            }
+
+            results.append(result)
+            skipped += 1
+            continue
+
+        result = run_mobile_telegram_release(
+            current_time=current_time,
+            resolved=resolved,
+            language=language,
+            timeout=timeout,
+            dry_run=dry_run,
+        )
+
+        results.append(result)
+
+        status = result.get("status")
+
+        if status == "SENT":
+            sent += 1
+            continue
+
+        if status == "SKIPPED":
+            skipped += 1
+            continue
+
+        return {
+            "status": "FAILED",
+            "processed": results,
+            "sent": sent,
+            "skipped": skipped,
+            "failed": 1,
+        }
+
+    return {
+        "status": "COMPLETED",
+        "processed": results,
+        "sent": sent,
+        "skipped": skipped,
+        "failed": 0,
     }
 
 
