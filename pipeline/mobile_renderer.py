@@ -1964,10 +1964,13 @@ def render_mobile_edition(
         )
 
         # -------------------------------------------------------------
-        # ROW 1 — INDEXES
+        # MARKET DATA ROWS
         # -------------------------------------------------------------
 
-        row1_y = y + 22
+        # Keep every data row aligned to the same vertical column.
+        data_x = 190
+
+        row1_y = y + 28
         label = "INDEXES"
 
         draw.text(
@@ -1976,14 +1979,6 @@ def render_mobile_edition(
             font=_font(12, bold=True),
             fill=BLACK,
         )
-
-        label_bbox = draw.textbbox(
-            (MARGIN, row1_y),
-            label,
-            font=_font(12, bold=True),
-        )
-
-        data_x = label_bbox[2] + 10
 
         indexes = "   |   ".join(
             [
@@ -2005,15 +2000,11 @@ def render_mobile_edition(
             indexes,
             data_x,
             row1_y - 4,
-            scale_x=1.06,
+            scale_x=1.10,
             max_right=WIDTH - MARGIN,
         )
 
-        # -------------------------------------------------------------
-        # ROW 2 — COMMODITIES
-        # -------------------------------------------------------------
-
-        row2_y = y + 40
+        row2_y = y + 52
         label = "COMMODITIES"
 
         draw.text(
@@ -2022,14 +2013,6 @@ def render_mobile_edition(
             font=_font(12, bold=True),
             fill=BLACK,
         )
-
-        label_bbox = draw.textbbox(
-            (MARGIN, row2_y),
-            label,
-            font=_font(12, bold=True),
-        )
-
-        data_x = label_bbox[2] + 10
 
         commodities = "   |   ".join(
             [
@@ -2059,15 +2042,11 @@ def render_mobile_edition(
             commodities,
             data_x,
             row2_y - 4,
-            scale_x=1.06,
+            scale_x=1.10,
             max_right=WIDTH - MARGIN,
         )
 
-        # -------------------------------------------------------------
-        # ROW 3 — CURRENCY / GLOBAL
-        # -------------------------------------------------------------
-
-        row3_y = y + 58
+        row3_y = y + 76
         label = "CURRENCY / GLOBAL"
 
         draw.text(
@@ -2076,14 +2055,6 @@ def render_mobile_edition(
             font=_font(12, bold=True),
             fill=BLACK,
         )
-
-        label_bbox = draw.textbbox(
-            (MARGIN, row3_y),
-            label,
-            font=_font(12, bold=True),
-        )
-
-        data_x = label_bbox[2] + 10
 
         currencies = "   |   ".join(
             [
@@ -2110,7 +2081,7 @@ def render_mobile_edition(
             currencies,
             data_x,
             row3_y - 4,
-            scale_x=1.06,
+            scale_x=1.10,
             max_right=WIDTH - MARGIN,
         )
 
@@ -2467,7 +2438,7 @@ def render_mobile_edition(
 
             # Keep MARKETS TODAY closer to the footer so more
             # vertical space remains available for news cards.
-            markets_y = MOBILE_PAGE_HEIGHT - footer_height + 50
+            markets_y = MOBILE_PAGE_HEIGHT - footer_height + 48
 
             draw_markets_today(
                 canvas,
