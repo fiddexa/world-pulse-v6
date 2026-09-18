@@ -18,6 +18,11 @@ from pipeline.edition_id import (
     build_edition_id,
 )
 from pipeline.edition_slots import EDITION_SLOTS
+from pipeline.geography import (
+    COUNTRY_NAMES,
+    GENERIC_REGIONS,
+    detect_headline_countries,
+)
 
 
 SECTION_ORDER = (
@@ -360,45 +365,6 @@ def _build_mobile_audio_selection(
     - never force the edition to a fixed story count
     """
 
-    generic_regions = {
-        "global", "world", "europe", "asia", "africa", "americas",
-        "north_america", "south_america", "middle_east",
-        "central_asia", "southeast_asia", "east_asia", "south_asia",
-    }
-
-    country_names = {
-        "afghanistan", "albania", "algeria", "angola", "argentina", "armenia",
-        "australia", "austria", "azerbaijan", "bahrain", "bangladesh",
-        "belarus", "belgium", "belize", "benin", "bhutan", "bolivia",
-        "bosnia_and_herzegovina", "botswana", "brazil", "brunei",
-        "bulgaria", "burkina_faso", "burundi", "cambodia", "cameroon",
-        "canada", "chad", "chile", "china", "colombia", "comoros",
-        "congo", "costa_rica", "croatia", "cuba", "cyprus", "czechia",
-        "denmark", "djibouti", "dominican_republic", "ecuador", "egypt",
-        "el_salvador", "eritrea", "estonia", "ethiopia", "finland",
-        "france", "gabon", "gambia", "georgia", "germany", "ghana",
-        "greece", "guatemala", "guinea", "guyana", "haiti", "honduras",
-        "hungary", "iceland", "india", "indonesia", "iran", "iraq",
-        "ireland", "israel", "italy", "ivory_coast", "jamaica", "japan",
-        "jordan", "kazakhstan", "kenya", "kuwait", "kyrgyzstan", "laos",
-        "latvia", "lebanon", "lesotho", "liberia", "libya", "lithuania",
-        "luxembourg", "madagascar", "malawi", "malaysia", "maldives",
-        "mali", "malta", "mauritania", "mauritius", "mexico", "moldova",
-        "mongolia", "montenegro", "morocco", "mozambique", "myanmar",
-        "namibia", "nepal", "netherlands", "new_zealand", "nicaragua",
-        "niger", "nigeria", "north_korea", "north_macedonia", "norway",
-        "oman", "pakistan", "panama", "paraguay", "peru", "philippines",
-        "poland", "portugal", "qatar", "romania", "russia", "rwanda",
-        "saudi_arabia", "senegal", "serbia", "singapore", "slovakia",
-        "slovenia", "somalia", "south_africa", "south_korea", "south_sudan",
-        "spain", "sri_lanka", "sudan", "sweden", "switzerland", "syria",
-        "taiwan", "tajikistan", "tanzania", "thailand", "togo", "tunisia",
-        "turkey", "turkmenistan", "uganda", "ukraine",
-        "united_arab_emirates", "united_kingdom", "united_states",
-        "uruguay", "uzbekistan", "venezuela", "vietnam", "yemen",
-        "zambia", "zimbabwe", "palestine", "kosovo",
-    }
-
     topic_groups = {
         "conflict": {
             "military_conflict", "military", "attack", "drone_attack",
@@ -482,84 +448,23 @@ def _build_mobile_audio_selection(
                 .replace(" ", "_")
             )
 
-            if token and token not in generic_regions:
+            if token and token not in GENERIC_REGIONS:
                 result.add(token)
 
         return result
-
-    country_headline_aliases = {
-        "american": "united_states",
-        "british": "united_kingdom",
-        "canadian": "canada",
-        "chinese": "china",
-        "french": "france",
-        "german": "germany",
-        "greek": "greece",
-        "indian": "india",
-        "indonesian": "indonesia",
-        "iranian": "iran",
-        "iraqi": "iraq",
-        "israeli": "israel",
-        "italian": "italy",
-        "japanese": "japan",
-        "kenyan": "kenya",
-        "lebanese": "lebanon",
-        "libyan": "libya",
-        "malaysian": "malaysia",
-        "moldovan": "moldova",
-        "nepali": "nepal",
-        "nigerian": "nigeria",
-        "norwegian": "norway",
-        "pakistani": "pakistan",
-        "polish": "poland",
-        "portuguese": "portugal",
-        "qatari": "qatar",
-        "russian": "russia",
-        "saudi": "saudi_arabia",
-        "senegalese": "senegal",
-        "serbian": "serbia",
-        "south_korean": "south_korea",
-        "spanish": "spain",
-        "sudanese": "sudan",
-        "syrian": "syria",
-        "taiwanese": "taiwan",
-        "thai": "thailand",
-        "turkish": "turkey",
-        "ukrainian": "ukraine",
-        "uzbek": "uzbekistan",
-        "vietnamese": "vietnam",
-        "yemeni": "yemen",
-        "zambian": "zambia",
-        "zimbabwean": "zimbabwe",
-        "malian": "mali",
-        "egyptian": "egypt",
-        "ethiopian": "ethiopia",
-        "ghanaian": "ghana",
-        "jordanian": "jordan",
-        "moroccan": "morocco",
-        "nepalese": "nepal",
-        "filipino": "philippines",
-        "philippine": "philippines",
-        "congolese": "democratic_republic_of_congo",
-    }
 
     def countries_of(event):
         countries = {
             token
             for token in locations_of(event)
-            if token in country_names
+            if token in COUNTRY_NAMES
         }
 
-        title = text_of(event).lower()
-
-        for country in country_names:
-            phrase = country.replace("_", " ")
-            if re.search(r"\b" + re.escape(phrase) + r"\b", title):
-                countries.add(country)
-
-        for alias, country in country_headline_aliases.items():
-            if re.search(r"\b" + re.escape(alias) + r"\b", title):
-                countries.add(country)
+        countries.update(
+            detect_headline_countries(
+                text_of(event)
+            )
+        )
 
         return countries
 

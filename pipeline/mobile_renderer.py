@@ -9,6 +9,13 @@ import qrcode
 import hashlib
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
+from pipeline.geography import (
+    GENERIC_REGIONS,
+    countries_from_event_locations,
+    detect_headline_countries,
+    detect_headline_places,
+    detect_headline_regions,
+)
 
 
 # =====================================================================
@@ -989,54 +996,358 @@ def _collect_events(edition: dict) -> list[dict]:
 
 
 def _event_card_label(event: dict) -> str:
-    """Return the automatic editorial topic for a news card."""
+    """Return the most useful concise geography/topic label."""
 
     if not isinstance(event, dict):
         return "WORLD"
 
     content = event.get("content")
+    intelligence = event.get("intelligence")
+    articles = event.get("articles")
 
-    # Use the automatically classified editorial section first.
+    def display_country(value: str) -> str:
+        aliases = {
+            "united_states": "USA",
+            "united_kingdom": "UK",
+            "saudi_arabia": "SAUDI ARABIA",
+            "south_korea": "SOUTH KOREA",
+            "north_korea": "NORTH KOREA",
+            "south_africa": "SOUTH AFRICA",
+            "south_sudan": "SOUTH SUDAN",
+            "new_zealand": "NEW ZEALAND",
+            "united_arab_emirates": "UAE",
+            "costa_rica": "COSTA RICA",
+            "dominican_republic": "DOMINICAN REPUBLIC",
+            "el_salvador": "EL SALVADOR",
+            "ivory_coast": "IVORY COAST",
+            "sri_lanka": "SRI LANKA",
+            "czechia": "CZECHIA",
+            "democratic_republic_of_congo": "DRC",
+        }
+
+        return aliases.get(
+            value,
+            value.replace("_", " ").upper(),
+        )
+
+    def fit_label(values: list[str]) -> str:
+        cleaned = []
+
+        for value in values:
+            value = str(value).strip().lower()
+
+            if not value or value in cleaned:
+                continue
+
+            cleaned.append(value)
+
+        if not cleaned:
+            return ""
+
+        labels = [
+            display_country(value)
+            for value in cleaned[:2]
+        ]
+
+        label = " / ".join(labels)
+
+        if len(label) <= 24:
+            return label
+
+        return labels[0][:24]
+
+    # -------------------------------------------------------------
+    # 1. COUNTRIES MENTIONED IN THE HEADLINE
+    # -------------------------------------------------------------
+
+    headline = ""
+
     if isinstance(content, dict):
-        section = _safe_text(content.get("section"))
+        headline = _safe_text(
+            content.get("headline")
+        ).strip()
 
-        if section:
-            aliases = {
-                "world": "WORLD",
-                "geopolitics": "GEOPOLITICS",
-                "politics": "GEOPOLITICS",
-                "business": "BUSINESS",
-                "economy": "BUSINESS",
-                "economic": "BUSINESS",
-                "energy": "ENERGY",
-                "technology": "TECHNOLOGY",
-                "tech": "TECHNOLOGY",
-                "science": "SCIENCE & HEALTH",
-                "health": "SCIENCE & HEALTH",
-                "science_health": "SCIENCE & HEALTH",
-                "science & health": "SCIENCE & HEALTH",
-                "climate": "CLIMATE",
-                "environment": "CLIMATE",
-                "trade": "TRADE & LOGISTICS",
-                "logistics": "TRADE & LOGISTICS",
-                "trade_logistics": "TRADE & LOGISTICS",
-                "society": "SOCIETY",
-                "social": "SOCIETY",
-                "culture": "CULTURE",
-                "arts": "CULTURE",
-                "sports": "SPORTS",
-                "sport": "SPORTS",
-            }
+    if not headline and isinstance(articles, list):
+        for article in articles:
+            if not isinstance(article, dict):
+                continue
 
-            label = aliases.get(
-                section.strip().lower()
+            headline = _safe_text(
+                article.get("original_title")
+                or article.get("title")
+            ).strip()
+
+            if headline:
+                break
+
+    if not headline:
+        headline = _safe_text(
+            event.get("headline")
+            or event.get("title")
+        ).strip()
+
+    headline_countries = detect_headline_countries(
+        headline
+    )
+
+    label = fit_label(headline_countries)
+
+    if label:
+        return label
+
+    # -------------------------------------------------------------
+    # 2. COUNTRIES ALREADY PRESENT IN EVENT METADATA
+    # -------------------------------------------------------------
+
+    metadata_values = []
+
+    if isinstance(intelligence, dict):
+        values = intelligence.get("locations")
+
+        if isinstance(values, list):
+            metadata_values.extend(values)
+
+    if isinstance(content, dict):
+        values = content.get("affected_areas")
+
+        if isinstance(values, list):
+            metadata_values.extend(values)
+
+    if isinstance(articles, list):
+        for article in articles:
+            if not isinstance(article, dict):
+                continue
+
+            values = article.get("locations")
+
+            if isinstance(values, list):
+                metadata_values.extend(values)
+
+    metadata_countries = []
+
+    for country in countries_from_event_locations(
+        metadata_values
+    ):
+        metadata_countries.append(country)
+
+    label = fit_label(
+        sorted(metadata_countries)
+    )
+
+    if label:
+        return label
+
+    # -------------------------------------------------------------
+    # 3. REGION FROM HEADLINE
+    # -------------------------------------------------------------
+
+    headline_places = detect_headline_places(
+        headline
+    )
+
+    label = fit_label(headline_places)
+
+    if label:
+        return label
+
+    headline_regions = detect_headline_regions(
+        headline
+    )
+
+    for region in headline_regions:
+        if region:
+            return region.replace(
+                "_", " "
+            ).upper()[:24]
+
+    # -------------------------------------------------------------
+    # 4. REGION FROM METADATA
+    # -------------------------------------------------------------
+
+    if isinstance(intelligence, dict):
+        regions = intelligence.get("regions")
+
+        if isinstance(regions, list):
+            for region in regions:
+                value = _safe_text(region).strip()
+
+                if value:
+                    return value.upper()[:24]
+
+    metadata_regions = []
+
+    for value in metadata_values:
+        token = (
+            _safe_text(value)
+            .strip()
+            .lower()
+            .replace("-", "_")
+            .replace(" ", "_")
+        )
+
+        if token in GENERIC_REGIONS:
+            metadata_regions.append(token)
+
+    if metadata_regions:
+        return metadata_regions[0].replace(
+            "_", " "
+        ).upper()[:24]
+
+    # -------------------------------------------------------------
+    # 5. EVENT TYPE / HEADLINE TOPIC FALLBACK
+    # -------------------------------------------------------------
+
+    event_type_labels = {
+        "political": "GEOPOLITICS",
+        "diplomatic": "GEOPOLITICS",
+        "military": "GEOPOLITICS",
+        "military_conflict": "GEOPOLITICS",
+        "missile_strike": "GEOPOLITICS",
+        "economic": "BUSINESS",
+        "business": "BUSINESS",
+        "trade": "TRADE & LOGISTICS",
+        "energy": "ENERGY",
+        "technology": "TECHNOLOGY",
+        "health": "SCIENCE & HEALTH",
+        "medical": "SCIENCE & HEALTH",
+        "climate": "CLIMATE",
+        "environment": "CLIMATE",
+        "natural_disaster": "CLIMATE",
+        "society": "SOCIETY",
+        "humanitarian": "SOCIETY",
+        "culture": "CULTURE",
+        "sports": "SPORTS",
+    }
+
+    if isinstance(intelligence, dict):
+        for event_type in intelligence.get(
+            "event_types",
+            [],
+        ):
+            label = event_type_labels.get(
+                _safe_text(event_type).strip().lower()
             )
 
             if label:
                 return label
 
-    # Final fallback to the existing section/category logic.
-    return _event_category(event)
+    headline_lower = headline.lower()
+
+    topic_rules = (
+        (
+            "CLIMATE",
+            (
+                "endangered species",
+                "freshwater",
+                "ice loss",
+                "greenland",
+                "antarctica",
+                "climate",
+                "wildfire",
+                "flood",
+                "heatwave",
+            ),
+        ),
+        (
+            "SCIENCE & HEALTH",
+            (
+                "scientists",
+                "scientist",
+                "species",
+                "research",
+                "study",
+                "health",
+                "medical",
+            ),
+        ),
+        (
+            "TECHNOLOGY",
+            (
+                "artificial intelligence",
+                " ai ",
+                "anthropic",
+                "openai",
+                "autonomous vehicles",
+                "digital",
+                "technology",
+            ),
+        ),
+        (
+            "CULTURE",
+            (
+                "singer",
+                "music",
+                "songs",
+                "macbeth",
+                "eurovision",
+                "film",
+                "museum",
+                "theatre",
+                "theater",
+                "artist",
+            ),
+        ),
+        (
+            "SOCIETY",
+            (
+                "child protection",
+                "social media",
+                "retirement",
+                "migrants",
+                "migration",
+                "education",
+            ),
+        ),
+    )
+
+    for label, keywords in topic_rules:
+        if any(keyword in headline_lower for keyword in keywords):
+            return label
+
+    # -------------------------------------------------------------
+    # 6. EDITORIAL SECTION
+    # -------------------------------------------------------------
+
+    section = ""
+
+    if isinstance(content, dict):
+        section = _safe_text(
+            content.get("section")
+        ).strip().lower()
+
+    section_aliases = {
+        "world": "WORLD",
+        "geopolitics": "GEOPOLITICS",
+        "politics": "GEOPOLITICS",
+        "business": "BUSINESS",
+        "economy": "BUSINESS",
+        "economic": "BUSINESS",
+        "energy": "ENERGY",
+        "technology": "TECHNOLOGY",
+        "tech": "TECHNOLOGY",
+        "science": "SCIENCE & HEALTH",
+        "health": "SCIENCE & HEALTH",
+        "science_health": "SCIENCE & HEALTH",
+        "science & health": "SCIENCE & HEALTH",
+        "climate": "CLIMATE",
+        "environment": "CLIMATE",
+        "trade": "TRADE & LOGISTICS",
+        "logistics": "TRADE & LOGISTICS",
+        "trade_logistics": "TRADE & LOGISTICS",
+        "society": "SOCIETY",
+        "social": "SOCIETY",
+        "culture": "CULTURE",
+        "arts": "CULTURE",
+        "sports": "SPORTS",
+        "sport": "SPORTS",
+    }
+
+    label = section_aliases.get(section)
+
+    if label and label != "WORLD":
+        return label
+
+    return "WORLD"
 
 def _event_category(event: dict) -> str:
     """Return a concise location/topic label for the story card."""
@@ -1341,10 +1652,13 @@ def render_mobile_edition(
     # MARKETS TODAY while allowing additional compact stories.
     content_bottom_first = 930
 
+    # PAGE 02+ uses the actual rendered footer geometry.
+    # footer-pages.png renders to 24 px at WIDTH=900.
+    # Keep the same safety gap used by last-page branding.
     content_bottom_other = (
         MOBILE_PAGE_HEIGHT
-        - red_bar_height
-        - MARGIN
+        - 24
+        - LAST_PAGE_FOOTER_GAP
     )
 
     available_first = (
@@ -1445,7 +1759,7 @@ def render_mobile_edition(
             if header_path.exists():
                 try:
                     with Image.open(header_path) as source:
-                        header = source.convert("RGB")
+                        header = source.convert("RGBA")
 
                     # Exact mobile page width and compact header height.
                     header = ImageOps.fit(
@@ -1461,51 +1775,14 @@ def render_mobile_edition(
                     canvas.paste(
                         header,
                         (0, 0),
-                    )
-
-                    # MORNING BRIEFING — placed in the open space
-                    # between the interrupted top lines of the header.
-                    briefing = "MORNING BRIEFING"
-
-                    briefing_bbox = draw.textbbox(
-                        (0, 0),
-                        briefing,
-                        font=_font(13, bold=True),
-                    )
-
-                    briefing_width = (
-                        briefing_bbox[2] - briefing_bbox[0]
-                    )
-
-                    # Center MORNING BRIEFING inside the open gap
-                    # between the two interrupted top header lines.
-                    gap_left = 624
-                    gap_right = 814
-
-                    briefing_x = (
-                        gap_left
-                        + (
-                            gap_right
-                            - gap_left
-                            - briefing_width
-                        ) // 2
-                    )
-
-                    draw.text(
-                        (
-                            briefing_x,
-                            32,
-                        ),
-                        briefing,
-                        font=_font(13, bold=True),
-                        fill=BLACK,
+                        header,
                     )
 
                 except Exception:
                     pass
 
             # ---------------------------------------------------------
-            # EDITION / DATE / MORNING BRIEFING / PAGE
+            # EDITION / DATE / PAGE
             # ---------------------------------------------------------
 
             info_y = 191
@@ -1514,8 +1791,6 @@ def render_mobile_edition(
             edition_date = _format_date(
                 _edition_date(edition)
             )
-            edition_name = _edition_name(edition)
-
             draw.text(
                 (
                     MARGIN,
@@ -1603,8 +1878,6 @@ def render_mobile_edition(
             edition_date = _format_date(
                 _edition_date(edition)
             )
-            edition_name = _edition_name(edition)
-
             draw.text(
                 (
                     MARGIN,
@@ -1637,9 +1910,6 @@ def render_mobile_edition(
             date_x = divider_1 + 14
 
             date_text = edition_date.upper()
-
-            if edition_name:
-                date_text += f"  •  {edition_name}"
 
             draw.text(
                 (
@@ -1958,10 +2228,13 @@ def render_mobile_edition(
         )
 
         # -------------------------------------------------------------
-        # ROW 1 — INDEXES
+        # MARKET DATA ROWS
         # -------------------------------------------------------------
 
-        row1_y = y + 22
+        # Keep every data row aligned to the same vertical column.
+        data_x = 190
+
+        row1_y = y + 28
         label = "INDEXES"
 
         draw.text(
@@ -1970,14 +2243,6 @@ def render_mobile_edition(
             font=_font(12, bold=True),
             fill=BLACK,
         )
-
-        label_bbox = draw.textbbox(
-            (MARGIN, row1_y),
-            label,
-            font=_font(12, bold=True),
-        )
-
-        data_x = label_bbox[2] + 10
 
         indexes = "   |   ".join(
             [
@@ -1998,16 +2263,12 @@ def render_mobile_edition(
             canvas,
             indexes,
             data_x,
-            row1_y - 4,
-            scale_x=1.06,
+            row1_y,
+            scale_x=1.10,
             max_right=WIDTH - MARGIN,
         )
 
-        # -------------------------------------------------------------
-        # ROW 2 — COMMODITIES
-        # -------------------------------------------------------------
-
-        row2_y = y + 40
+        row2_y = y + 52
         label = "COMMODITIES"
 
         draw.text(
@@ -2016,14 +2277,6 @@ def render_mobile_edition(
             font=_font(12, bold=True),
             fill=BLACK,
         )
-
-        label_bbox = draw.textbbox(
-            (MARGIN, row2_y),
-            label,
-            font=_font(12, bold=True),
-        )
-
-        data_x = label_bbox[2] + 10
 
         commodities = "   |   ".join(
             [
@@ -2052,16 +2305,12 @@ def render_mobile_edition(
             canvas,
             commodities,
             data_x,
-            row2_y - 4,
-            scale_x=1.06,
+            row2_y,
+            scale_x=1.10,
             max_right=WIDTH - MARGIN,
         )
 
-        # -------------------------------------------------------------
-        # ROW 3 — CURRENCY / GLOBAL
-        # -------------------------------------------------------------
-
-        row3_y = y + 58
+        row3_y = y + 76
         label = "CURRENCY / GLOBAL"
 
         draw.text(
@@ -2070,14 +2319,6 @@ def render_mobile_edition(
             font=_font(12, bold=True),
             fill=BLACK,
         )
-
-        label_bbox = draw.textbbox(
-            (MARGIN, row3_y),
-            label,
-            font=_font(12, bold=True),
-        )
-
-        data_x = label_bbox[2] + 10
 
         currencies = "   |   ".join(
             [
@@ -2103,8 +2344,8 @@ def render_mobile_edition(
             canvas,
             currencies,
             data_x,
-            row3_y - 4,
-            scale_x=1.06,
+            row3_y,
+            scale_x=1.10,
             max_right=WIDTH - MARGIN,
         )
 
@@ -2461,7 +2702,7 @@ def render_mobile_edition(
 
             # Keep MARKETS TODAY closer to the footer so more
             # vertical space remains available for news cards.
-            markets_y = MOBILE_PAGE_HEIGHT - footer_height + 50
+            markets_y = MOBILE_PAGE_HEIGHT - footer_height + 48
 
             draw_markets_today(
                 canvas,

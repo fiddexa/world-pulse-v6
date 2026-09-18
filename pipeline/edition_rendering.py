@@ -93,10 +93,6 @@ def render_edition(
                     output_path,
                     page_number=physical_page_number,
                     page_plan=plan,
-                    is_last_page=(
-                        physical_page_number
-                        == total_full_pages
-                    ),
                 )
                 full_files.append(str(output_path))
                 physical_page_number += 1
