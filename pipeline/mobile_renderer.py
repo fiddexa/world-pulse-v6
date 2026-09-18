@@ -2263,7 +2263,7 @@ def render_mobile_edition(
             canvas,
             indexes,
             data_x,
-            row1_y - 4,
+            row1_y,
             scale_x=1.10,
             max_right=WIDTH - MARGIN,
         )
@@ -2305,7 +2305,7 @@ def render_mobile_edition(
             canvas,
             commodities,
             data_x,
-            row2_y - 4,
+            row2_y,
             scale_x=1.10,
             max_right=WIDTH - MARGIN,
         )
@@ -2344,7 +2344,7 @@ def render_mobile_edition(
             canvas,
             currencies,
             data_x,
-            row3_y - 4,
+            row3_y,
             scale_x=1.10,
             max_right=WIDTH - MARGIN,
         )
