@@ -1,0 +1,13 @@
+services:
+  - type: worker
+    name: around-the-main-bot
+    runtime: python
+    buildCommand: pip install -r bot/requirements.txt
+    startCommand: python -m bot.main
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: AROUND_THE_MAIN_CHANNEL_USERNAME
+        value: "@aroundthemain"
+      - key: AROUND_THE_MAIN_CHANNEL_URL
+        value: "https://t.me/aroundthemain"
