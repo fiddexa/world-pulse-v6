@@ -266,8 +266,6 @@ async def check_subscription(
     if query is None:
         return
 
-    await query.answer()
-
     language = context.user_data.get("language", "en")
     user_id = query.from_user.id
 
@@ -304,9 +302,9 @@ async def check_subscription(
 
     except Exception:
         LOG.exception("Subscription check failed for user %s", user_id)
-        await query.answer(
+        await query.edit_message_text(
             "⚠️ Unable to verify subscription right now.",
-            show_alert=True,
+            reply_markup=channel_keyboard(language),
         )
 
 
