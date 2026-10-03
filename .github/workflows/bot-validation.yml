@@ -1,0 +1,44 @@
+name: AROUND THE MAIN - Bot Validation
+
+on:
+  push:
+    branches:
+      - main
+      - growth-bot
+    paths:
+      - "bot/**"
+      - "render.yaml"
+      - ".github/workflows/bot-validation.yml"
+  pull_request:
+    paths:
+      - "bot/**"
+      - "render.yaml"
+      - ".github/workflows/bot-validation.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install bot dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r bot/requirements.txt
+
+      - name: Compile bot
+        run: |
+          python -m compileall -q bot
+
+      - name: Verify imports
+        env:
+          TELEGRAM_BOT_TOKEN: "validation-token"
+        run: |
+          python -c "import bot.main; print('Bot import OK')"
