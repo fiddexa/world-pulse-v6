@@ -1,6 +1,6 @@
 {
   "2026": {
-    "last_number": 310,
+    "last_number": 311,
     "slots": {
       "AROUND-THE-MAIN-EN-2026-09-07-0700": 1,
       "AROUND-THE-MAIN-EN-2026-09-07-2000": 2,
@@ -311,7 +311,8 @@
       "AROUND-THE-MAIN-EN-2026-11-20-2000": 307,
       "AROUND-THE-MAIN-EN-2026-11-21-0700": 308,
       "AROUND-THE-MAIN-EN-2026-11-21-1300": 309,
-      "AROUND-THE-MAIN-EN-2026-11-21-2000": 310
+      "AROUND-THE-MAIN-EN-2026-11-21-2000": 310,
+      "AROUND-THE-MAIN-EN-2026-11-22-0700": 311
     }
   }
 }
